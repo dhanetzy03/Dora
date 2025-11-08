@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once "../db_connect.php"; // Adjust path if needed
+require_once "../../config/db_connect.php";
 
 $error = "";
 
