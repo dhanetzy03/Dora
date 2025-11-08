@@ -1,10 +1,16 @@
 <?php
 session_start();
-require_once "../db_connect.php"; // Adjust path if needed
 
-$error = "";
+// Check if user is logged in and is admin
+if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
+    header("Location: ../auth/login.php");
+    exit();
+}
 
-// --- Handle Add Item Form Submission ---
+// Redirect to the new dashboard
+header("Location: dashboard.php");
+exit();
+?>
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $item_name = trim($_POST['item_name']);
     $category = trim($_POST['category']);
@@ -190,6 +196,19 @@ $recentChanges = $conn->query("SELECT COUNT(*) AS c FROM inventory WHERE DATE(la
         margin-bottom: 15px;
         font-weight: 500;
     }
+    .logout-btn {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background-color: #dc3545;
+        color: white;
+        padding: 8px 14px;
+        text-decoration: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    .logout-btn:hover { background-color: #c82333; }
 </style>
 </head>
 <body>
@@ -204,6 +223,7 @@ $recentChanges = $conn->query("SELECT COUNT(*) AS c FROM inventory WHERE DATE(la
 </div>
 
 <div class="main">
+    <a href="../auth/logout.php" class="logout-btn">Logout</a>
     <h1>A Web-Based Inventory Tracking System with Enhanced Stock Monitoring and Sales Validation for Shukran Café</h1>
 
     <div class="dashboard-cards">
