@@ -2,7 +2,7 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 session_start();
-include("../../config/db_connect.php");
+require_once "../../config/db_connect.php";
 
 $error = "";
 
@@ -19,17 +19,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($result->num_rows === 1) {
         $user = $result->fetch_assoc();
 
-        // Since you’re using plain text password (123)
+        // Since you're using plain text password
         if ($password === $user["password"]) {
             $_SESSION["username"] = $user["username"];
-            $_SESSION["user_type"] = $user["user_type"]; // 'admin' or 'staff'
+            $_SESSION["role"] = $user["role"]; // 'admin' or 'staff'
+            $_SESSION["user_id"] = $user["user_id"];
 
             // Redirect based on role
-            if ($user["user_type"] === "admin") {
-                header("Location: dashboard/admin.php");
+            if ($user["role"] === "admin") {
+                header("Location: ../admindash/admin.php");
                 exit();
             } else {
-                header("Location: dashboard/staff.php");
+                header("Location: ../dashboard/staff.php");
                 exit();
             }
         } else {
