@@ -23,10 +23,39 @@ $totalValue = 0; // Can calculate based on price if added later
 <title>Inventory Management - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="../styles/admin-style.css">
+<style>
+/* Remove underline under icon links */
+.btn-icon { text-decoration: none; color: inherit; display: inline-block; }
+.btn-icon:hover { text-decoration: none; }
+.btn-icon i { vertical-align: middle; }
+
+/* Flash notification styling */
+.flash {
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    max-width: 760px;
+    width: 100%;
+    text-align: center;
+}
+.flash-success { background: #e6ffed; color: #116530; }
+.flash-error { background: #ffecec; color: #a10000; }
+
+/* simple fade out */
+.fade-out { animation: fadeOut 0.6s ease forwards; }
+@keyframes fadeOut { to { opacity: 0; transform: translateY(-6px); }}
+</style>
 </head>
 <body>
 
 <?php include 'sidebar.php'; ?>
+<?php
+// Flash messages from add/update actions
+$success = $_SESSION['success'] ?? null;
+$error = $_SESSION['error'] ?? null;
+unset($_SESSION['success'], $_SESSION['error']);
+?>
 
 <div class="main-content">
     <div class="top-bar">
@@ -61,6 +90,17 @@ $totalValue = 0; // Can calculate based on price if added later
         </div>
     </div>
 
+    <!-- Flash notification area (appears under the stats cards) -->
+    <div id="flashContainer" style="margin-top:16px;display:flex;justify-content:center;">
+        <?php if ($error): ?>
+            <div id="flash" class="flash flash-error"><?= htmlspecialchars($error) ?></div>
+        <?php elseif ($success): ?>
+            <div id="flash" class="flash flash-success"><?= htmlspecialchars($success) ?></div>
+        <?php else: ?>
+            <div id="flash" class="flash" style="display:none;"></div>
+        <?php endif; ?>
+    </div>
+
     <div class="content-card">
         <div class="card-header">
             <h2>Inventory Items</h2>
@@ -91,15 +131,33 @@ $totalValue = 0; // Can calculate based on price if added later
                         <td><?= htmlspecialchars($item['reorder_level']) ?></td>
                         <td>
                             <?php
-                                $status = $item['status'];
-                                $class = $status === 'Sufficient' ? 'badge-success' : ($status === 'Low Stock' ? 'badge-warning' : 'badge-danger');
+                                $status_db = $item['status'];
+                                // Map DB status to display label and class
+                                if (strtolower($status_db) === 'sufficient') {
+                                    $display_status = 'Good';
+                                    $class = 'badge-success';
+                                } elseif (strtolower($status_db) === 'low stock') {
+                                    $display_status = 'Low Stock';
+                                    $class = 'badge-warning';
+                                } else {
+                                    $display_status = 'Out of Stock';
+                                    $class = 'badge-danger';
+                                }
                             ?>
-                            <span class="badge <?= $class ?>"><?= htmlspecialchars($status) ?></span>
+                            <span class="badge <?= $class ?>"><?= htmlspecialchars($display_status) ?></span>
                         </td>
                         <td><?= date('M d, Y', strtotime($item['last_updated'])) ?></td>
                         <td>
-                            <button class="btn-icon" title="Edit"><i class='bx bx-edit'></i></button>
-                            <button class="btn-icon" title="Delete"><i class='bx bx-trash'></i></button>
+                                     <a class="btn-icon" title="Edit" href="#" onclick="showEditModal(this); return false;" 
+                                         data-id="<?= htmlspecialchars($item['id'], ENT_QUOTES) ?>"
+                                         data-item_name="<?= htmlspecialchars($item['item_name'], ENT_QUOTES) ?>"
+                                         data-category="<?= htmlspecialchars($item['category'], ENT_QUOTES) ?>"
+                                         data-unit="<?= htmlspecialchars($item['unit'] ?? 'pcs', ENT_QUOTES) ?>"
+                                         data-stock_qty="<?= htmlspecialchars($item['stock_qty'], ENT_QUOTES) ?>"
+                                         data-reorder_level="<?= htmlspecialchars($item['reorder_level'], ENT_QUOTES) ?>">
+                                         <i class='bx bx-edit'></i>
+                                     </a>
+                            <a class="btn-icon" title="Delete" href="delete_inventory.php?id=<?= urlencode($item['id']) ?>" onclick="return confirm('Are you sure you want to delete this item?');"><i class='bx bx-trash'></i></a>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -155,6 +213,47 @@ $totalValue = 0; // Can calculate based on price if added later
     </div>
 </div>
 
+<!-- Edit Item Modal -->
+<div id="editModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Edit Item</h2>
+            <span class="close" onclick="closeEditModal()">&times;</span>
+        </div>
+        <form id="editForm" method="POST" action="edit_inventory.php">
+            <input type="hidden" name="id" id="edit_id">
+            <div class="form-group">
+                <label>Item Name *</label>
+                <input type="text" name="item_name" id="edit_item_name" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Category *</label>
+                    <input type="text" name="category" id="edit_category" required>
+                </div>
+                <div class="form-group">
+                    <label>Unit *</label>
+                    <input type="text" name="unit" id="edit_unit" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Stock Quantity *</label>
+                    <input type="number" name="stock_qty" id="edit_stock_qty" required>
+                </div>
+                <div class="form-group">
+                    <label>Reorder Level </label>
+                    <input type="number" name="reorder_level" id="edit_reorder_level" placeholder="Leave empty to keep current">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+                <button type="submit" class="btn-primary">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
 function showAddModal() {
     document.getElementById('addModal').style.display = 'block';
@@ -162,6 +261,37 @@ function showAddModal() {
 function closeAddModal() {
     document.getElementById('addModal').style.display = 'none';
 }
+// Edit modal handlers
+function showEditModal(el) {
+    var id = el.getAttribute('data-id');
+    var name = el.getAttribute('data-item_name');
+    var category = el.getAttribute('data-category');
+    var unit = el.getAttribute('data-unit');
+    var qty = el.getAttribute('data-stock_qty');
+    var reorder = el.getAttribute('data-reorder_level');
+
+    document.getElementById('edit_id').value = id;
+    document.getElementById('edit_item_name').value = name;
+    document.getElementById('edit_category').value = category;
+    document.getElementById('edit_unit').value = unit;
+    document.getElementById('edit_stock_qty').value = qty;
+    document.getElementById('edit_reorder_level').value = (reorder === null || reorder === 'NULL') ? '' : reorder;
+
+    document.getElementById('editModal').style.display = 'block';
+}
+function closeEditModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+// Auto-hide flash message after 5 seconds with a fade
+window.addEventListener('DOMContentLoaded', function(){
+    var flash = document.getElementById('flash');
+    if (!flash) return;
+    if (flash.style.display === 'none') return;
+    setTimeout(function(){
+        flash.classList.add('fade-out');
+        setTimeout(function(){ if (flash.parentNode) flash.parentNode.style.display='none'; }, 700);
+    }, 5000);
+});
 </script>
 
 </body>

@@ -20,19 +20,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $user = $result->fetch_assoc();
 
         // Since you're using plain text password
-        if ($password === $user["password"]) {
-            $_SESSION["username"] = $user["username"];
-            $_SESSION["role"] = $user["role"]; // 'admin' or 'staff'
-            $_SESSION["user_id"] = $user["user_id"];
+    if ($password === $user["password"]) {
+      $_SESSION["username"] = $user["username"];
+      $_SESSION["role"] = $user["role"]; // 'admin' or 'staff'
+      $_SESSION["user_id"] = $user["user_id"];
 
-            // Redirect based on role
-            if ($user["role"] === "admin") {
-                header("Location: ../admindash/admin.php");
-                exit();
-            } else {
-                header("Location: ../dashboard/staff.php");
-                exit();
-            }
+      // Save previous last_login (if any) so we can show it on the dashboard
+      $_SESSION['last_login'] = $user['last_login'] ?? null;
+
+      // Ensure users table has a last_login column; add if missing
+      $colCheck = $conn->query("SHOW COLUMNS FROM users LIKE 'last_login'");
+      if ($colCheck && $colCheck->num_rows === 0) {
+        $conn->query("ALTER TABLE users ADD COLUMN last_login DATETIME NULL");
+      }
+
+      // Update the user's last_login to current UTC time for consistency
+      if (isset($user['user_id'])) {
+        $upd = $conn->prepare("UPDATE users SET last_login = UTC_TIMESTAMP() WHERE user_id = ?");
+        $upd->bind_param('i', $user['user_id']);
+        $upd->execute();
+        // ignore errors here - not critical
+      }
+
+      // Redirect based on role
+      if ($user["role"] === "admin") {
+        header("Location: ../admindash/admin.php");
+        exit();
+      } else {
+        header("Location: ../dashboard/staff.php");
+        exit();
+      }
         } else {
             $error = "Invalid password.";
         }

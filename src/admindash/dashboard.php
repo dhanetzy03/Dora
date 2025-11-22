@@ -168,7 +168,15 @@ $critical_stock = $conn->query("SELECT * FROM inventory WHERE status='Low Stock'
             </div>
             <div>
                 <p style="color: #666; margin-bottom: 5px;">Last Login</p>
-                <strong style="color: #333;"><?= date('M d, Y H:i') ?></strong>
+                <?php if (!empty($_SESSION['last_login'])): 
+                    // convert session value (assumed UTC or server time) to ISO UTC string for client conversion
+                    $ts = $_SESSION['last_login'];
+                    $iso = date('Y-m-d\TH:i:s\Z', strtotime($ts));
+                ?>
+                    <strong id="lastLogin" data-last-login="<?= htmlspecialchars($iso, ENT_QUOTES) ?>">Loading...</strong>
+                <?php else: ?>
+                    <strong id="lastLogin">—</strong>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -176,3 +184,19 @@ $critical_stock = $conn->query("SELECT * FROM inventory WHERE status='Low Stock'
 
 </body>
 </html>
+
+<script>
+// Convert server-provided UTC last-login to user's local time
+document.addEventListener('DOMContentLoaded', function(){
+    var el = document.getElementById('lastLogin');
+    if (!el) return;
+    var iso = el.getAttribute('data-last-login');
+    if (!iso) return;
+    // Parse ISO as UTC and format to 'M d, Y H:i'
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return;
+    var options = { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' };
+    // toLocaleString will use user's locale and timezone
+    el.textContent = d.toLocaleString(undefined, options).replace(',', '');
+});
+</script>
