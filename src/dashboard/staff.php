@@ -117,7 +117,7 @@ $validated_sales = $conn->query("SELECT COUNT(*) as c FROM sales WHERE created_b
             <div class="form-row">
                 <div class="form-group">
                     <label>Sale Date & Time *</label>
-                    <input type="datetime-local" name="sale_date" value="<?= date('Y-m-d\TH:i') ?>" required>
+                    <input id="sale_date_input" type="datetime-local" name="sale_date" value="" required>
                 </div>
                 <div class="form-group">
                     <label>Customer Name</label>
@@ -193,3 +193,17 @@ $validated_sales = $conn->query("SELECT COUNT(*) as c FROM sales WHERE created_b
 
 </body>
 </html>
+
+<script>
+// Fill the datetime-local input with the user's local current date/time
+document.addEventListener('DOMContentLoaded', function(){
+    var el = document.getElementById('sale_date_input');
+    if (!el) return;
+    // If the field already has a value (e.g., editing), don't overwrite
+    if (el.value && el.value.trim() !== '') return;
+    var now = new Date();
+    function pad(n){ return n.toString().padStart(2,'0'); }
+    var local = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate()) + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+    el.value = local;
+});
+</script>
