@@ -6,6 +6,85 @@ if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
 }
 require_once "../../config/db_connect.php";
 
+// --- START: AJAX ENDPOINT 1 - FETCH SALE ITEMS ---
+if (isset($_GET['action']) && $_GET['action'] === 'fetch_sale_items' && isset($_GET['sale_id'])) {
+    $sale_id = (int)$_GET['sale_id'];
+
+    // Join sale_items (s_i) with products (p) to get item names.
+    $stmt = $conn->prepare("
+        SELECT 
+            s_i.sale_item_id,
+            s_i.quantity, 
+            s_i.unit_cost_at_sale,
+            s_i.markup_rate,
+            s_i.unit_price, -- SELLING PRICE
+            s_i.subtotal,   -- TOTAL SALES
+            p.product_name
+        FROM sale_items s_i
+        JOIN products p ON s_i.product_id = p.product_id
+        WHERE s_i.sale_id = ?
+    ");
+    $stmt->bind_param("i", $sale_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $items = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+    
+    header('Content-Type: application/json');
+    echo json_encode(['success' => true, 'items' => $items]);
+    exit();
+}
+// --- END: AJAX ENDPOINT 1 ---
+
+
+// --- START: AJAX ENDPOINT 2 - UPDATE MARKUP (RECALCULATES SELLING PRICE and TOTAL SALES) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_markup'])) {
+    $sale_item_id = (int)$_POST['sale_item_id'];
+    $new_markup_rate = (float)$_POST['markup_rate']; // Passed as a decimal (e.g., 0.20)
+    
+    // 1. Fetch item cost and quantity
+    $stmt_fetch = $conn->prepare("SELECT quantity, unit_cost_at_sale FROM sale_items WHERE sale_item_id = ?");
+    $stmt_fetch->bind_param("i", $sale_item_id);
+    $stmt_fetch->execute();
+    $item_data = $stmt_fetch->get_result()->fetch_assoc();
+    $stmt_fetch->close();
+    
+    if ($item_data) {
+        $unit_cost = (float)$item_data['unit_cost_at_sale'];
+        $quantity = (float)$item_data['quantity'];
+        
+        // Calculation: SELLING PRICE = UNIT COST * (1 + MARKUP RATE)
+        $new_unit_price = $unit_cost * (1 + $new_markup_rate);
+        
+        // Calculation: TOTAL SALES = SELLING PRICE * QUANTITY
+        $new_subtotal = $new_unit_price * $quantity;
+        
+        // 2. Update the sale_items row
+        $stmt_update = $conn->prepare("
+            UPDATE sale_items 
+            SET markup_rate = ?, unit_price = ?, subtotal = ? 
+            WHERE sale_item_id = ?
+        ");
+        $stmt_update->bind_param("dddi", $new_markup_rate, $new_unit_price, $new_subtotal, $sale_item_id);
+        $stmt_update->execute();
+        $stmt_update->close();
+        
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true, 
+            'new_selling_price' => number_format($new_unit_price, 2), 
+            'new_total_sales' => number_format($new_subtotal, 2)
+        ]);
+        exit();
+    }
+    
+    header('Content-Type: application/json');
+    echo json_encode(['success' => false, 'message' => 'Item not found or calculation failed.']);
+    exit();
+}
+// --- END: MARKUP UPDATE ENDPOINT ---
+
+
 // Handle validation action
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['validate_sale'])) {
     $sale_id = (int)$_POST['sale_id'];
@@ -49,6 +128,86 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
 <title>Sales Validation - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 <link rel="stylesheet" href="../styles/admin-style.css">
+<style>
+/* Basic Modal Styles */
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 1000; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    overflow: auto; 
+    background-color: rgba(0,0,0,0.4); 
+}
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto; 
+    padding: 25px; 
+    border: 1px solid #888;
+    width: 95%; 
+    max-width: 1200px; 
+    border-radius: 8px;
+    box-shadow: 0 4px 12px 0 rgba(0,0,0,0.3); 
+}
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 30px; 
+    font-weight: bold;
+    cursor: pointer;
+}
+.close:hover, .close:focus {
+    color: #000;
+}
+
+/* --- Table Spacing & Alignment --- */
+
+/* Apply more padding to all table cells inside the modal AND main tables */
+.data-table th, 
+.data-table td {
+    padding: 10px 12px; 
+    text-align: left;
+    white-space: nowrap; 
+}
+
+/* Specific alignment for numerical columns in the MODAL (#transactionTable):
+   1: DATE, 2: ORDER NO., 3: QUANTITY, 4: UNIT COST, 5: MARK UP, 6: SELLING PRICE, 7: TOTAL SALES
+*/
+#transactionTable td:nth-child(3), /* QUANTITY */
+#transactionTable td:nth-child(4), /* UNIT COST */
+#transactionTable td:nth-child(5), /* MARK UP */
+#transactionTable td:nth-child(6), /* SELLING PRICE */
+#transactionTable td:nth-child(7)  /* TOTAL SALES */
+{
+    text-align: right;
+}
+
+/* Alignment for numerical columns in the PENDING SALES summary table: */
+.data-table:not(#transactionTable) tbody tr td:nth-child(6) /* SELLING PRICE/Total Amount */
+{
+    text-align: right;
+}
+
+/* Style for the editable markup input field */
+.markup-input {
+    width: 50px;
+    text-align: right;
+    border: 1px solid #ccc;
+    padding: 4px 6px; 
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+.markup-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.markup-cell {
+    white-space: nowrap;
+}
+</style>
 </head>
 <body>
 
@@ -56,7 +215,7 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
 
 <div class="main-content">
     <div class="top-bar">
-        <h1>Sales Validation</h1>
+        <h1>💸 Sales Validation & Monitoring</h1>
         <div class="user-info">
             <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span>
             <a href="../auth/logout.php" class="btn-logout">Logout</a>
@@ -86,7 +245,6 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
         </div>
     </div>
 
-    <!-- Pending Sales -->
     <div class="content-card">
         <div class="card-header">
             <h2>Pending Sales (Require Validation)</h2>
@@ -95,38 +253,33 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Sale #</th>
-                        <th>Date</th>
-                        <th>Staff</th>
-                        <th>Customer</th>
-                        <th>Amount</th>
-                        <th>Payment</th>
-                        <th>Status</th>
-                        <th>Action</th>
+                        <th>DATE</th>
+                        <th>ORDER NO.</th>
+                        <th>QUANTITY</th>
+                        <th>UNIT COST</th>
+                        <th>MARK UP</th>
+                        <th>SELLING PRICE</th>
+                        <th>TOTAL SALES</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($pending_sales)): ?>
-                    <tr><td colspan="8" style="text-align: center; padding: 30px; color: #999;">No pending sales to validate</td></tr>
+                    <tr><td colspan="7" style="text-align: center; padding: 30px; color: #999;">No pending sales to validate</td></tr>
                     <?php else: ?>
                     <?php foreach ($pending_sales as $sale): ?>
                     <tr>
-                        <td><strong><?= htmlspecialchars($sale['sale_number']) ?></strong></td>
                         <td><?= date('M d, Y H:i', strtotime($sale['sale_date'])) ?></td>
-                        <td><?= htmlspecialchars($sale['staff_name']) ?></td>
-                        <td><?= htmlspecialchars($sale['customer_name'] ?: 'Walk-in') ?></td>
-                        <td><strong>₱<?= number_format($sale['total_amount'], 2) ?></strong></td>
-                        <td><?= ucfirst($sale['payment_method']) ?></td>
+                        <td><strong><?= htmlspecialchars($sale['sale_number']) ?></strong></td>
+                        <td>-</td>
+                        <td>-</td>
                         <td><span class="badge badge-warning">Pending</span></td>
-                        <td>
-                            <form method="POST" style="display: inline;">
-                                <input type="hidden" name="sale_id" value="<?= $sale['sale_id'] ?>">
-                                <button type="submit" name="validate_sale" class="btn-primary" style="padding: 6px 12px; font-size: 12px;">
-                                    <i class='bx bx-check'></i> Validate
-                                </button>
-                            </form>
-                            <button class="btn-icon" onclick="viewDetails(<?= $sale['sale_id'] ?>)" title="View Details">
-                                <i class='bx bx-show'></i>
+                        <td><strong>₱<?= number_format($sale['total_amount'], 2) ?></strong></td>
+                        <td style="text-align: center;">
+                            <button class="btn-primary" 
+                                onclick="showDetailsModal(<?= $sale['sale_id'] ?>, '<?= htmlspecialchars($sale['sale_number']) ?>', '<?= date('M d, Y', strtotime($sale['sale_date'])) ?>')" 
+                                style="padding: 6px 12px; font-size: 12px;"
+                                title="Review and Validate">
+                                <i class='bx bx-search-alt'></i> Review
                             </button>
                         </td>
                     </tr>
@@ -137,7 +290,6 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
         </div>
     </div>
 
-    <!-- Validated Sales -->
     <div class="content-card">
         <div class="card-header">
             <h2>Recently Validated Sales</h2>
@@ -173,10 +325,150 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
     </div>
 </div>
 
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeDetailsModal()">&times;</span>
+        <h2 id="modalTitle">Transaction Details</h2>
+        <input type="hidden" id="currentSaleId">
+
+        <div class="table-responsive" style="margin-top: 20px;">
+            <table class="data-table" id="transactionTable">
+                <thead>
+                    <tr>
+                        <th>DATE</th>
+                        <th>ORDER NO.</th>
+                        <th>QUANTITY</th>
+                        <th>UNIT COST</th>
+                        <th>MARK UP (%)</th>
+                        <th>SELLING PRICE</th>
+                        <th>TOTAL SALES</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionBody">
+                    <tr><td colspan="7" style="text-align: center;">Loading transaction items...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div style="text-align: right; margin-top: 20px;">
+            <button class="btn-secondary" onclick="closeDetailsModal()">Close Review</button>
+            <form id="validationForm" method="POST" action="" style="display: inline-block;">
+                <input type="hidden" name="sale_id" id="validationSaleId">
+                <button type="submit" name="validate_sale" class="btn-primary">
+                    <i class='bx bx-check-circle'></i> Mark as Validated
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
-function viewDetails(saleId) {
-    alert('View sale details functionality - Sale ID: ' + saleId);
-    // Can implement modal to show sale items details
+function closeDetailsModal() {
+    document.getElementById('detailsModal').style.display = 'none';
+}
+
+function showDetailsModal(saleId, saleNumber, saleDate) {
+    const modal = document.getElementById('detailsModal');
+    const title = document.getElementById('modalTitle');
+    const tableBody = document.getElementById('transactionBody');
+    
+    // Set IDs for form submission
+    document.getElementById('currentSaleId').value = saleId;
+    document.getElementById('validationSaleId').value = saleId;
+
+    title.innerText = `Transaction Details for Sale #${saleNumber}`;
+    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading transaction items...</td></tr>';
+    modal.style.display = 'block';
+
+    fetch(`sales_validation.php?action=fetch_sale_items&sale_id=${saleId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.items && data.items.length > 0) {
+                tableBody.innerHTML = '';
+                
+                data.items.forEach(item => {
+                    const saleDateFormatted = saleDate; // Using the sale date passed in
+                    const saleNumberFormatted = saleNumber; // Using the sale number passed in
+                    
+                    const totalSales = parseFloat(item.subtotal).toFixed(2);
+                    
+                    const row = `
+                        <tr data-sale-item-id="${item.sale_item_id}">
+                            <td>${saleDateFormatted}</td> 
+                            <td>${saleNumberFormatted}</td>
+                            <td>${parseFloat(item.quantity).toFixed(0)}</td>
+                            <td>₱${parseFloat(item.unit_cost_at_sale).toFixed(2)}</td>
+                            <td class="markup-cell">
+                                <input type="number" 
+                                    class="markup-input" 
+                                    value="${(item.markup_rate * 100).toFixed(0)}" 
+                                    min="0"
+                                    max="1000"
+                                    data-sale-item-id="${item.sale_item_id}"
+                                    onchange="updateMarkup(this)">%
+                            </td>
+                            <td class="selling-price-cell">₱${parseFloat(item.unit_price).toFixed(2)}</td>
+                            <td class="total-sales-cell">₱${totalSales}</td>
+                        </tr>
+                    `;
+                    tableBody.innerHTML += row;
+                });
+            } else {
+                 tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No item details found for this sale.</td></tr>';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching transactions:', error);
+            tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">An error occurred while fetching data.</td></tr>';
+        });
+}
+
+function updateMarkup(inputElement) {
+    const saleItemId = inputElement.getAttribute('data-sale-item-id');
+    const newMarkupPercent = parseFloat(inputElement.value);
+    
+    // Convert percentage back to a decimal rate (e.g., 20% -> 0.20)
+    const newMarkupRate = newMarkupPercent / 100; 
+
+    if (isNaN(newMarkupRate) || newMarkupRate < 0) {
+        alert("Please enter a valid markup percentage.");
+        return;
+    }
+
+    // Use AJAX to send the update to the server
+    const formData = new FormData();
+    formData.append('update_markup', true);
+    formData.append('sale_item_id', saleItemId);
+    formData.append('markup_rate', newMarkupRate); // Send the decimal rate
+
+    fetch('sales_validation.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const row = inputElement.closest('tr');
+            
+            // Update the display cells with the new calculated values
+            const sellingPriceCell = row.querySelector('.selling-price-cell');
+            const totalSalesCell = row.querySelector('.total-sales-cell');
+            
+            sellingPriceCell.innerHTML = `₱${data.new_selling_price}`;
+            totalSalesCell.innerHTML = `₱${data.new_total_sales}`;
+
+            // Provide visual feedback
+            inputElement.style.backgroundColor = '#e8f5e9';
+            setTimeout(() => inputElement.style.backgroundColor = 'transparent', 1500);
+
+        } else {
+            alert('Failed to update markup: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating markup:', error);
+        alert('A network error occurred while updating the markup.');
+    });
 }
 </script>
 
