@@ -16,10 +16,6 @@
             <i class='bx bx-check-circle'></i>
             <span>Sales Validation</span>
         </a>
-        <a href="stock_monitoring.php" class="nav-item <?= basename($_SERVER['PHP_SELF']) == 'stock_monitoring.php' ? 'active' : '' ?>">
-            <i class='bx bx-line-chart'></i>
-            <span>Stock Monitoring</span>
-        </a>
         <a href="reports.php" class="nav-item <?= basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : '' ?>">
             <i class='bx bx-file'></i>
             <span>Reports</span>

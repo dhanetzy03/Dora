@@ -19,7 +19,36 @@ $movements = $conn->query("
 // Calculate stats
 $total_in = $conn->query("SELECT COALESCE(SUM(quantity), 0) as total FROM stock_movements WHERE movement_type='in'")->fetch_assoc()['total'];
 $total_out = $conn->query("SELECT COALESCE(SUM(quantity), 0) as total FROM stock_movements WHERE movement_type='out'")->fetch_assoc()['total'];
-$low_stock = $conn->query("SELECT COUNT(*) as c FROM inventory WHERE status='Low Stock' OR status='Out of Stock'")->fetch_assoc()['c'];
+$low_stock = $conn->query("SELECT COUNT(*) as c FROM inventory WHERE stock_qty <= reorder_level")->fetch_assoc()['c'];
+
+// --- NEW FEATURE: Fast/Slow Moving Calculations ---
+
+// Fast Moving (Condition 1: stock meets critical level in 2 days | Condition 2: 80% within the week)
+// Simplified: 80% of current stock quantity was moved OUT in the last 7 days.
+$fast_moving_count = $conn->query("SELECT COUNT(i.id) as c 
+    FROM inventory i
+    INNER JOIN (
+        SELECT product_id, SUM(quantity) as weekly_out 
+        FROM stock_movements 
+        WHERE movement_type='out' AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) 
+        GROUP BY product_id
+    ) sm ON i.id = sm.product_id
+    WHERE sm.weekly_out >= (i.stock_qty * 0.8)
+")->fetch_assoc()['c'];
+
+// Slow Moving (Condition 1: 10 days not critical | Condition 2: stock is ordered after 2 months)
+// Simplified: No OUT movements in the last 60 days AND the current stock is NOT low/critical.
+$slow_moving_count = $conn->query("SELECT COUNT(i.id) as c 
+    FROM inventory i
+    LEFT JOIN (
+        SELECT DISTINCT product_id 
+        FROM stock_movements 
+        WHERE movement_type='out' AND created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY) 
+    ) sm ON i.id = sm.product_id
+    WHERE sm.product_id IS NULL AND i.stock_qty > 0 AND i.stock_qty > i.reorder_level
+")->fetch_assoc()['c'];
+
+// ----------------------------------------------------
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -65,11 +94,26 @@ $low_stock = $conn->query("SELECT COUNT(*) as c FROM inventory WHERE status='Low
                 <p>Low Stock Items</p>
             </div>
         </div>
-    </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #f0e6ff;"><i class='bx bx-run' style="color: #6200ea;"></i></div>
+            <div class="stat-info">
+                <h3><?= $fast_moving_count ?></h3>
+                <p>Fast Moving Items</p>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon" style="background: #e0f7fa;"><i class='bx bx-walk' style="color: #00bcd4;"></i></div>
+            <div class="stat-info">
+                <h3><?= $slow_moving_count ?></h3>
+                <p>Slow Moving Items</p>
+            </div>
+        </div>
+        </div>
 
     <div class="content-card">
         <div class="card-header">
-            <h2>Stock Movement History</h2>
+            <h2>Transaction Monitoring (Stock Movement History)</h2>
             <button class="btn-primary" onclick="showAddMovement()"><i class='bx bx-plus'></i> Add Movement</button>
         </div>
         <div class="table-responsive">
