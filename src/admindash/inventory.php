@@ -5,6 +5,7 @@ if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     exit();
 }
 require_once "../../config/db_connect.php";
+require_once "../../config/db_helper.php";
 
 // --- START: STOCK TRANSACTIONS FETCHING (NEW AJAX ENDPOINT) ---
 // This is the missing endpoint that fetches the data when you click the item code.
@@ -13,7 +14,12 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_transactions' && isset(
     $item_id = (int)$_GET['item_id'];
     
     // 1. Fetch item details (for item code, name, and current cost)
-    $stmt_item = $conn->prepare("SELECT id, item_code, item_name, cost_per_unit FROM inventory WHERE id = ?");
+    // Select cost_per_unit only if the column exists to avoid SQL errors on older DBs
+    $cols = 'id, item_code, item_name';
+    if (column_exists('inventory', 'cost_per_unit')) {
+        $cols .= ', cost_per_unit';
+    }
+    $stmt_item = $conn->prepare("SELECT {$cols} FROM inventory WHERE id = ?");
     $stmt_item->bind_param("i", $item_id);
     $stmt_item->execute();
     $item_data = $stmt_item->get_result()->fetch_assoc();
@@ -40,7 +46,9 @@ if (isset($_GET['action']) && $_GET['action'] === 'fetch_transactions' && isset(
         foreach ($transactions as $txn) {
             $quantity = (int)$txn['quantity'];
             // Use logged cost if available, otherwise use the current item cost
-            $unit_cost = (float)($txn['unit_cost_at_movement'] ?? $item_data['cost_per_unit']); 
+            // Use logged cost if available, otherwise fall back to item's current cost (or 0 if not present)
+            $item_cost = isset($item_data['cost_per_unit']) ? (float)$item_data['cost_per_unit'] : 0.0;
+            $unit_cost = (float)($txn['unit_cost_at_movement'] ?? $item_cost);
             $amount = $quantity * $unit_cost;
             
             $response['transactions'][] = [
@@ -110,7 +118,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['movement_type'])) {
     } else {
         // 1. Get current stock quantity AND COST
         // NOTE: cost_per_unit is critical for logging the cost at the time of movement
-        $stmt_current = $conn->prepare("SELECT stock_qty, item_name, reorder_level, cost_per_unit FROM inventory WHERE id = ?");
+        // Select cost_per_unit only if present
+        $cols_cur = 'stock_qty, item_name, reorder_level';
+        if (column_exists('inventory', 'cost_per_unit')) {
+            $cols_cur .= ', cost_per_unit';
+        }
+        $stmt_current = $conn->prepare("SELECT {$cols_cur} FROM inventory WHERE id = ?");
         $stmt_current->bind_param("i", $product_id);
         $stmt_current->execute();
         $result_current = $stmt_current->get_result();
@@ -119,8 +132,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['movement_type'])) {
 
         if ($item_data) {
             $previous_quantity = $item_data['stock_qty'];
-            // NEW: Get current unit cost
-            $current_unit_cost = (float)$item_data['cost_per_unit']; 
+            // NEW: Get current unit cost (if available)
+            $current_unit_cost = isset($item_data['cost_per_unit']) ? (float)$item_data['cost_per_unit'] : 0.0; 
             $new_quantity = $previous_quantity;
             $item_name = $item_data['item_name'];
             $reorder_level = $item_data['reorder_level'];
@@ -207,45 +220,59 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
     if (empty($item_code) || empty($item_name) || empty($category) || empty($unit)) {
         // ERROR LOGIC REMOVED
     } else {
+        $hasCost = column_exists('inventory', 'cost_per_unit');
         if ($item_id > 0) {
             // EDIT/UPDATE LOGIC
             // NOTE: stock_qty is not included in the UPDATE since it should be managed by the Movement Modal for logging integrity.
-            $sql = "UPDATE inventory SET item_code = ?, item_name = ?, category = ?, unit = ?, cost_per_unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
-            $stmt = $conn->prepare($sql);
-            if (!$stmt) {
-                // ERROR LOGIC REMOVED
-            } else {
-                $stmt->bind_param("ssssdisi", $item_code, $item_name, $category, $unit, $cost_per_unit, $reorder_level, $status, $item_id);
-
-                if ($stmt->execute()) {
-                    // SUCCESS LOGIC REMOVED
-                } else {
-                    // ERROR LOGIC REMOVED
+            if ($hasCost) {
+                $sql = "UPDATE inventory SET item_code = ?, item_name = ?, category = ?, unit = ?, cost_per_unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                if ($stmt) {
+                    $stmt->bind_param("ssssdisi", $item_code, $item_name, $category, $unit, $cost_per_unit, $reorder_level, $status, $item_id);
+                    $stmt->execute();
+                    $stmt->close();
                 }
-                $stmt->close();
+            } else {
+                $sql = "UPDATE inventory SET item_code = ?, item_name = ?, category = ?, unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
+                $stmt = $conn->prepare($sql);
+                if ($stmt) {
+                    $stmt->bind_param("sssssii", $item_code, $item_name, $category, $unit, $reorder_level, $status, $item_id);
+                    $stmt->execute();
+                    $stmt->close();
+                }
             }
 
         } else {
             // ADD LOGIC (Original)
-            $sql = "INSERT INTO inventory (item_code, item_name, category, unit, stock_qty, cost_per_unit, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-            $stmt = $conn->prepare($sql);
-            
-            if (!$stmt) {
-                // ERROR LOGIC REMOVED
-            } else {
-                $stmt->bind_param("ssssdiis", $item_code, $item_name, $category, $unit, $stock_qty, $cost_per_unit, $reorder_level, $status);
-
-                // 3. Execute the query
-                if ($stmt->execute()) {
-                    // SUCCESS LOGIC REMOVED
-                } else {
-                    if ($conn->errno == 1062) {
-                        // ERROR LOGIC REMOVED
+            if ($hasCost) {
+                $sql = "INSERT INTO inventory (item_code, item_name, category, unit, stock_qty, cost_per_unit, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                $stmt = $conn->prepare($sql);
+                if ($stmt) {
+                    $stmt->bind_param("ssssdiis", $item_code, $item_name, $category, $unit, $stock_qty, $cost_per_unit, $reorder_level, $status);
+                    if ($stmt->execute()) {
+                        // SUCCESS LOGIC REMOVED
                     } else {
-                        // ERROR LOGIC REMOVED
+                        if ($conn->errno == 1062) {
+                            // ERROR LOGIC REMOVED
+                        }
                     }
+                    $stmt->close();
                 }
-                $stmt->close();
+            } else {
+                // Fallback when database does not have cost_per_unit
+                $sql = "INSERT INTO inventory (item_code, item_name, category, unit, stock_qty, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+                $stmt = $conn->prepare($sql);
+                if ($stmt) {
+                    $stmt->bind_param("sssiiss", $item_code, $item_name, $category, $unit, $stock_qty, $reorder_level, $status);
+                    if ($stmt->execute()) {
+                        // SUCCESS LOGIC REMOVED
+                    } else {
+                        if ($conn->errno == 1062) {
+                            // ERROR LOGIC REMOVED
+                        }
+                    }
+                    $stmt->close();
+                }
             }
         }
     }
@@ -307,9 +334,307 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, must-revalidate">
 <title>Inventory Management - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<link rel="stylesheet" href="../styles/admin-style.css">
+<!-- Inline full admin CSS to prevent FOUC on first load -->
+<style>
+body.shukran-admin * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body.shukran-admin {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f7fa;
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: 260px;
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    color: white;
+    padding: 0;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 1002;
+    transition: transform 0.25s ease, width 0.25s ease;
+}
+
+/* Sidebar header / toggle */
+.sidebar-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Sidebar header / toggle */
+.sidebar-header {
+    padding: 30px 20px;
+    text-align: center;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.sidebar-header h2 {
+    font-size: 24px;
+    margin-bottom: 5px;
+}
+
+.sidebar-header p {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+.sidebar-nav {
+    padding: 20px 0;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 25px;
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+    transition: all 0.3s;
+    border-left: 3px solid transparent;
+}
+
+.nav-item:hover {
+    background: rgba(255,255,255,0.1);
+    color: white;
+}
+
+.nav-item.active {
+    background: rgba(255,255,255,0.15);
+    color: white;
+    border-left-color: white;
+}
+
+.nav-item i {
+    font-size: 20px;
+    margin-right: 15px;
+}
+
+/* Main Content (support both .main-content and legacy .main) */
+.main-content,
+.main {
+    margin-left: 260px !important; /* account for fixed sidebar width */
+    flex: 1;
+    padding: 18px 16px; /* reduce horizontal padding so content aligns closer to sidebar */
+    min-height: 100vh;
+    background: transparent;
+    position: relative;
+    transition: margin-left 0.22s ease, width 0.22s ease;
+}
+
+/* Ensure main area fills remaining width beside the fixed sidebar */
+.main-content, .main {
+    width: calc(100% - 260px) !important;
+}
+
+/* Responsive: collapse sidebar on small screens and let main be full width */
+@media (max-width: 900px) {
+    .sidebar { transform: translateX(-260px); }
+    .main-content, .main { margin-left: 0 !important; width: 100% !important; }
+}
+
+/* Collapsed sidebar state (toggle on body.collapsed) */
+body.collapsed .sidebar {
+    transform: translateX(-220px);
+}
+
+body.collapsed .main-content,
+body.collapsed .main {
+    margin-left: 60px;
+}
+
+body.collapsed .main-content,
+body.collapsed .main {
+    width: calc(100% - 60px);
+}
+
+/* Make sure sidebar nav stays scrollable and doesn't overlap content */
+.sidebar-nav { padding: 18px 0 30px; }
+.sidebar { box-shadow: 2px 0 8px rgba(0,0,0,0.08); }
+
+/* Ensure sidebar header sticks on top when scrolling */
+.sidebar-header { position: sticky; top: 0; z-index: 2; }
+
+/* Ensure top bar spacing when using fixed header */
+.main .top-bar,
+.main-content .top-bar {
+    margin-bottom: 18px;
+}
+
+.top-bar {
+    background: white;
+    padding: 20px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.top-bar h1 {
+    font-size: 24px;
+    color: #333;
+}
+
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.user-info span {
+    color: #666;
+}
+
+.btn-logout {
+    background: #f44336;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.btn-logout:hover {
+    background: #d32f2f;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 30px;
+}
+
+.stat-card {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.stat-icon i {
+    font-size: 28px;
+}
+
+.stat-info h3 {
+    font-size: 32px;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.stat-info p {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Content Card */
+.content-card {
+    margin: 0 0 30px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.card-header {
+    padding: 25px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.card-header h2 {
+    font-size: 20px;
+    color: #333;
+}
+
+.btn-primary {
+    background: #4a5568;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s;
+}
+
+.btn-primary:hover {
+    background: #2d3748;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+}
+
+/* Table Styles */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table thead {
+    background: #f8f9fa;
+}
+
+.data-table th,
+data truncated for brevity (same CSS)
+</style>
+<!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
+<link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+<script>
+// Apply sidebar state BEFORE body renders to prevent layout shift
+// DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
+(function(){
+    var storedState = localStorage.getItem('sidebarCollapsed');
+    // Only collapse if explicitly set to 'true' in localStorage
+    if (storedState === 'true') {
+        document.documentElement.classList.add('sidebar-will-collapse');
+    }
+    // Otherwise default is expanded (no class needed)
+})();
+</script>
 
 <style>
 /* Base Modal Styles */
@@ -394,7 +719,7 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
 }
 </style>
 </head>
-<body>
+<body class="shukran-admin">
 
 <?php include 'sidebar.php'; ?>
 
@@ -407,23 +732,32 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
         </div>
     </div>
 
+    <?php if (!empty($_SESSION['success'])): ?>
+        <div class="alert-success">✅ <?= htmlspecialchars($_SESSION['success']) ?></div>
+        <?php unset($_SESSION['success']); ?>
+    <?php endif; ?>
+    <?php if (!empty($_SESSION['error'])): ?>
+        <div class="alert-error">⚠️ <?= htmlspecialchars($_SESSION['error']) ?></div>
+        <?php unset($_SESSION['error']); ?>
+    <?php endif; ?>
+
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #e3f2fd;"><i class='bx bx-package' style="color: #2196f3;"></i></div>
+            <div class="stat-icon bg-info-light"><i class='bx bx-package icon-info'></i></div>
             <div class="stat-info">
                 <h3><?= $totalItems ?></h3>
                 <p>Total Items</p>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #ffebee;"><i class='bx bx-error' style="color: #f44336;"></i></div>
+            <div class="stat-icon bg-danger-light"><i class='bx bx-error icon-danger'></i></div>
             <div class="stat-info">
                 <h3><?= $criticalItems ?></h3>
                 <p>Critical Stock</p>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #e8f5e9;"><i class='bx bx-dollar-circle' style="color: #4caf50;"></i></div>
+            <div class="stat-icon bg-success-light"><i class='bx bx-dollar-circle icon-success'></i></div>
             <div class="stat-info">
                 <h3>₱<?= number_format($totalInventoryCost, 2) ?></h3>
                 <p>Total Inventory Cost</p>
@@ -431,14 +765,14 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
         </div>
         
         <div class="stat-card">
-            <div class="stat-icon" style="background: #f0e6ff;"><i class='bx bx-run' style="color: #6200ea;"></i></div>
+            <div class="stat-icon bg-purple-light"><i class='bx bx-run icon-purple'></i></div>
             <div class="stat-info">
                 <h3><?= $fast_moving_count ?></h3>
                 <p>Fast Moving Items</p>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #e0f7fa;"><i class='bx bx-walk' style="color: #00bcd4;"></i></div>
+            <div class="stat-icon bg-info-light"><i class='bx bx-walk icon-info'></i></div>
             <div class="stat-info">
                 <h3><?= $slow_moving_count ?></h3>
                 <p>Slow Moving Items</p>
@@ -495,7 +829,7 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
                         $reorder_status = $stock_qty <= $reorder_level ? 'Critical' : 'Safe';
                     ?>
                     <tr>
-                        <td style="cursor: pointer; color: #5a67d8;" onclick="showLogModal(<?= $item_id ?>)">
+                        <td class="link-inventory" onclick="showLogModal(<?= $item_id ?>)">
                             <strong><?= htmlspecialchars($item['item_code'] ?? 'N/A') ?></strong>
                         </td>
                         <td><?= htmlspecialchars($item['item_name']) ?></td>
@@ -528,7 +862,7 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
                             </button>
                             <a href="?delete_id=<?= $item_id ?>" 
                                onclick="return confirm('Are you sure you want to permanently remove <?= htmlspecialchars($item['item_name']) ?>? This action cannot be undone.');">
-                                <button class="btn-icon delete-icon" title="Remove Item"><i class='bx bx-trash'></i></button>
+                                                <button class="btn-icon delete-icon" title="Remove Item" onclick="return confirm('Delete this item?')"><i class='bx bx-trash'></i></button>
                             </a>
                         </td>
                     </tr>
@@ -554,7 +888,7 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
                 <label>Item Name *</label>
                 <input type="text" name="item_name" required>
             </div>
-            <div class="form-row">
+            <div class="form-row form-gap">
                 <div class="form-group">
                     <label>Category *</label>
                     <select name="category" required>
@@ -577,7 +911,7 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
                     </select>
                 </div>
             </div>
-            <div class="form-row">
+            <div class="form-row form-gap">
                 <div class="form-group">
                     <label>Stock Quantity *</label>
                     <input type="number" name="stock_qty" required min="0">
@@ -613,9 +947,9 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
 
             <div class="form-group">
                 <label>Movement Type</label>
-                <div class="form-row" style="gap: 20px;">
-                    <label style="font-weight: normal;"><input type="radio" name="movement_type" value="in" required> Stock In (Add)</label>
-                    <label style="font-weight: normal;">Stock Out (Remove) <input type="radio" name="movement_type" value="out" required checked></label>
+                <div class="form-row form-gap">
+                    <label class="label-normal"><input type="radio" name="movement_type" value="in" required> Stock In (Add)</label>
+                    <label class="label-normal">Stock Out (Remove) <input type="radio" name="movement_type" value="out" required checked></label>
                 </div>
             </div>
             
@@ -699,7 +1033,7 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
 </div>
 
 <div id="logModal" class="modal">
-    <div class="modal-content" style="max-width: 900px;">
+    <div class="modal-content modal-lg">
         <div class="modal-header">
             <h2>Stock Transactions for: <span id="logItemNameDisplay"></span></h2>
             <span class="close" onclick="closeLogModal()">&times;</span>
@@ -723,7 +1057,7 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
                     </tr>
                 </thead>
                 <tbody id="logTableBody">
-                    <tr><td colspan="9" style="text-align: center;">Loading transactions...</td></tr>
+                    <tr><td colspan="9" class="empty-message">Loading transactions...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -784,7 +1118,7 @@ function showLogModal(itemId) {
     const tableBody = document.getElementById('logTableBody');
     
     // Show modal immediately with loading message
-    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">Loading transactions...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="9" class="empty-message">Loading transactions...</td></tr>';
     logModal.style.display = 'block';
 
     // Fetch data via AJAX
@@ -799,7 +1133,7 @@ function showLogModal(itemId) {
                 tableBody.innerHTML = ''; // Clear loading message
 
                 if (data.transactions.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">No stock movements logged for this item.</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="9" class="empty-message">No stock movements logged for this item.</td></tr>';
                     return;
                 }
 
@@ -820,12 +1154,12 @@ function showLogModal(itemId) {
                     tableBody.innerHTML += row;
                 });
             } else {
-                 tableBody.innerHTML = `<tr><td colspan="9" style="text-align: center;">Error: ${data.message}</td></tr>`;
+                 tableBody.innerHTML = `<tr><td colspan="9" class="empty-message">Error: ${data.message}</td></tr>`;
             }
         })
         .catch(error => {
             console.error('Error fetching transactions:', error);
-            tableBody.innerHTML = '<tr><td colspan="9" style="text-align: center;">An error occurred while fetching data.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="9" class="empty-message">An error occurred while fetching data.</td></tr>';
         });
 }
 // END: NEW FUNCTIONS FOR STOCK LOG MODAL

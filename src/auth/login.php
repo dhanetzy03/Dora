@@ -63,115 +63,410 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shukran Cafe Login Form</title>
+  <title>Shukran Café - Login</title>
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
   <style>
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      font-family: 'Poppins', sans-serif;
     }
 
     body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
       min-height: 100vh;
-      background-color: #e0e5ec;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 400px;
-      padding: 40px;
-      background-color: #e0e5ec;
-      border-radius: 20px;
-      box-shadow: 10px 10px 20px #b8b9be, -10px -10px 20px #ffffff;
-    }
-
-    .title {
-      text-align: center;
-      margin-bottom: 30px;
-      color: #31344b;
-      font-weight: 600;
-      font-size: 28px;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-    }
-
-    .input-group {
-      margin-bottom: 30px;
+      background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
       position: relative;
+      overflow: hidden;
     }
 
-    .input-group input {
+    /* Animated background elements */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
       width: 100%;
-      padding: 15px 20px 15px 50px;
-      border: none;
-      outline: none;
-      background-color: #e0e5ec;
-      border-radius: 15px;
+      height: 100%;
+      background-image: url('./img/tagpuanBGlogin.jpg');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      opacity: 0.15;
+      z-index: -1;
+    }
+
+    .login-container {
+      display: flex;
+      width: 100%;
+      height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Left side - Branding */
+    .login-brand {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      padding: 40px;
+      background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    }
+
+    .brand-logo {
+      width: 200px;
+      height: 200px;
+      margin-bottom: 30px;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      overflow: hidden;
+      border: 4px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+    }
+
+    .brand-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .brand-text h1 {
+      font-size: 48px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .brand-text p {
+      font-size: 18px;
+      opacity: 0.9;
+      margin-bottom: 30px;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    .brand-features {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-top: 30px;
+      text-align: center;
+    }
+
+    .feature {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      opacity: 0.85;
       font-size: 16px;
-      color: #31344b;
-      box-shadow: inset 5px 5px 10px #b8b9be, inset -5px -5px 10px #ffffff;
     }
 
-    .input-group i {
-      position: absolute;
-      left: 20px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: #31344b;
-      font-size: 20px;
+    .feature i {
+      font-size: 24px;
+      color: #4caf50;
     }
 
-    .btn {
+    /* Right side - Login Form */
+    .login-form-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+      background: #f5f7fa;
+    }
+
+    .login-form {
       width: 100%;
-      padding: 15px;
-      border: none;
+      max-width: 420px;
+      padding: 50px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    }
+
+    .form-header {
+      margin-bottom: 40px;
+      text-align: center;
+    }
+
+    .form-header h2 {
+      font-size: 32px;
+      color: #2d3748;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .form-header p {
+      color: #718096;
+      font-size: 16px;
+    }
+
+    .form-group {
+      margin-bottom: 25px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-wrapper i {
+      position: absolute;
+      left: 15px;
+      color: #4a5568;
+      font-size: 20px;
+      z-index: 1;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 14px 15px 14px 50px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: inherit;
+      color: #2d3748;
+      transition: all 0.3s;
+      background: #f9fafb;
+    }
+
+    .form-group input:focus {
       outline: none;
-      background-color: #e0e5ec;
-      border-radius: 15px;
+      border-color: #4a5568;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(74, 85, 104, 0.1);
+    }
+
+    .form-group input::placeholder {
+      color: #cbd5e0;
+    }
+
+    .error-message {
+      background: rgba(244, 67, 54, 0.1);
+      color: #b71c1c;
+      padding: 12px 16px;
+      border-radius: 8px;
+      border-left: 4px solid #f44336;
+      margin-bottom: 25px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .error-message i {
+      font-size: 18px;
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 14px 24px;
+      background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
       font-size: 16px;
       font-weight: 600;
-      color: #31344b;
       cursor: pointer;
-      box-shadow: 5px 5px 10px #b8b9be, -5px -5px 10px #ffffff;
-      transition: all 0.3s ease;
       text-transform: uppercase;
       letter-spacing: 1px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(74, 85, 104, 0.3);
     }
 
-    .btn:hover {
-      box-shadow: inset 5px 5px 10px #b8b9be, inset -5px -5px 10px #ffffff;
+    .login-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(74, 85, 104, 0.4);
     }
 
-    .error {
-      color: red;
+    .login-btn:active {
+      transform: translateY(0);
+    }
+
+    .form-footer {
+      margin-top: 30px;
       text-align: center;
-      margin-bottom: 15px;
+      color: #718096;
       font-size: 14px;
+    }
+
+    .form-footer a {
+      color: #4a5568;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.3s;
+    }
+
+    .form-footer a:hover {
+      color: #2d3748;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 900px) {
+      .login-container {
+        flex-direction: column;
+        height: auto;
+      }
+
+      .login-brand {
+        min-height: 300px;
+        padding: 30px 20px;
+      }
+
+      .brand-logo {
+        width: 150px;
+        height: 150px;
+      }
+
+      .brand-text h1 {
+        font-size: 36px;
+      }
+
+      .login-form-container {
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .login-form {
+        width: 90%;
+        max-width: 420px;
+        padding: 40px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .login-brand {
+        display: none;
+      }
+
+      .login-form-container {
+        flex: 1;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+      }
+
+      .login-form {
+        background: rgba(255, 255, 255, 0.95);
+        width: 90%;
+        padding: 30px;
+        backdrop-filter: blur(10px);
+      }
+
+      .form-header h2 {
+        font-size: 24px;
+      }
+
+      .form-header p {
+        font-size: 14px;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1 class="title">Login</h1>
-    <?php if ($error): ?>
-      <div class="error"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-    <form method="POST" action="">
-      <div class="input-group">
-        <i class="bx bx-user"></i>
-        <input type="text" name="username" placeholder="Username" required>
+  <div class="login-container">
+    <!-- Left side - Branding -->
+    <div class="login-brand">
+      <div class="brand-logo">
+        <img src="./img/skuhranlogo.jpg" alt="Shukran Café Logo">
       </div>
-      <div class="input-group">
-        <i class="bx bx-lock-alt"></i>
-        <input type="password" name="password" placeholder="Password" required>
+      <div class="brand-text">
+        <h1>☕ Shukran</h1>
+        <p>Premium Café Management System</p>
       </div>
-      <button type="submit" class="btn">Login</button>
-    </form>
+      <div class="brand-features">
+        <div class="feature">
+          <i class='bx bx-shield-check'></i>
+          <span>Secure Login</span>
+        </div>
+        <div class="feature">
+          <i class='bx bx-trending-up'></i>
+          <span>Real-time Analytics</span>
+        </div>
+        <div class="feature">
+          <i class='bx bx-fast-forward'></i>
+          <span>Efficient Workflow</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right side - Login Form -->
+    <div class="login-form-container">
+      <form method="POST" action="" class="login-form">
+        <div class="form-header">
+          <h2>Welcome Back</h2>
+          <p>Sign in to your account</p>
+        </div>
+
+        <?php if ($error): ?>
+        <div class="error-message">
+          <i class='bx bx-error-circle'></i>
+          <span><?= htmlspecialchars($error) ?></span>
+        </div>
+        <?php endif; ?>
+
+        <div class="form-group">
+          <label for="username">Username</label>
+          <div class="input-wrapper">
+            <i class='bx bx-user'></i>
+            <input 
+              type="text" 
+              id="username"
+              name="username" 
+              placeholder="Enter your username" 
+              required
+              autocomplete="username"
+            >
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <div class="input-wrapper">
+            <i class='bx bx-lock-alt'></i>
+            <input 
+              type="password" 
+              id="password"
+              name="password" 
+              placeholder="Enter your password" 
+              required
+              autocomplete="current-password"
+            >
+          </div>
+        </div>
+
+        <button type="submit" class="login-btn">
+          <i class='bx bx-log-in' style="margin-right: 8px;"></i> Sign In
+        </button>
+
+        <div class="form-footer">
+          <p>© 2025 Shukran Café. All rights reserved.</p>
+        </div>
+      </form>
+    </div>
   </div>
 </body>
 </html>

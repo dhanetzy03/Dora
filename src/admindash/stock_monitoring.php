@@ -48,6 +48,18 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
     WHERE sm.product_id IS NULL AND i.stock_qty > 0 AND i.stock_qty > i.reorder_level
 ")->fetch_assoc()['c'];
 
+// Additional: Total inventory cost and inventory list for Full Stock Monitoring
+$costColumnExists = false;
+$res_col = $conn->query("SHOW COLUMNS FROM inventory LIKE 'cost_per_unit'");
+if ($res_col && $res_col->num_rows > 0) {
+    $costColumnExists = true;
+    $total_inventory_cost = (float)($conn->query("SELECT COALESCE(SUM(stock_qty * COALESCE(cost_per_unit,0)), 0) as total_cost FROM inventory")->fetch_assoc()['total_cost'] ?? 0);
+} else {
+    // Keep page functional even when cost_per_unit column is missing
+    $total_inventory_cost = 0.0;
+}
+$inventory_list = $conn->query("SELECT * FROM inventory ORDER BY item_name ASC")->fetch_all(MYSQLI_ASSOC);
+
 // ----------------------------------------------------
 ?>
 <!DOCTYPE html>
@@ -55,11 +67,54 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, must-revalidate">
 <title>Stock Monitoring - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<link rel="stylesheet" href="../styles/admin-style.css">
+<!-- Inline full admin CSS to prevent FOUC on first load -->
+<style>
+body.shukran-admin * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body.shukran-admin {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f7fa;
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: 260px;
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    color: white;
+    padding: 0;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 1002;
+    transition: transform 0.25s ease, width 0.25s ease;
+}
+
+...css truncated for brevity...
+</style>
+<!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
+<link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+<script>
+// Apply sidebar state BEFORE body renders to prevent layout shift
+// DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
+(function(){
+    var storedState = localStorage.getItem('sidebarCollapsed');
+    // Only collapse if explicitly set to 'true' in localStorage
+    if (storedState === 'true') {
+        document.documentElement.classList.add('sidebar-will-collapse');
+    }
+    // Otherwise default is expanded (no class needed)
+})();
+</script>
 </head>
-<body>
+<body class="shukran-admin">
 
 <?php include 'sidebar.php'; ?>
 
@@ -74,21 +129,21 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
 
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #e8f5e9;"><i class='bx bx-download' style="color: #4caf50;"></i></div>
+            <div class="stat-icon bg-success-light"><i class='bx bx-download icon-success'></i></div>
             <div class="stat-info">
                 <h3><?= number_format($total_in) ?></h3>
                 <p>Total Stock In</p>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #ffebee;"><i class='bx bx-upload' style="color: #f44336;"></i></div>
+            <div class="stat-icon bg-danger-light"><i class='bx bx-upload icon-danger'></i></div>
             <div class="stat-info">
                 <h3><?= number_format($total_out) ?></h3>
                 <p>Total Stock Out</p>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #fff3cd;"><i class='bx bx-error' style="color: #856404;"></i></div>
+            <div class="stat-icon bg-warning-light"><i class='bx bx-error icon-warning'></i></div>
             <div class="stat-info">
                 <h3><?= $low_stock ?></h3>
                 <p>Low Stock Items</p>
@@ -96,20 +151,73 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
         </div>
         
         <div class="stat-card">
-            <div class="stat-icon" style="background: #f0e6ff;"><i class='bx bx-run' style="color: #6200ea;"></i></div>
+            <div class="stat-icon bg-purple-light"><i class='bx bx-run icon-purple'></i></div>
             <div class="stat-info">
                 <h3><?= $fast_moving_count ?></h3>
                 <p>Fast Moving Items</p>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #e0f7fa;"><i class='bx bx-walk' style="color: #00bcd4;"></i></div>
+            <div class="stat-icon bg-info-light"><i class='bx bx-walk icon-info'></i></div>
             <div class="stat-info">
                 <h3><?= $slow_moving_count ?></h3>
                 <p>Slow Moving Items</p>
             </div>
         </div>
         </div>
+
+    <div class="content-card">
+        <div class="card-header">
+            <h2>Full Stocks Monitoring</h2>
+            <div style="display:flex; gap:12px; align-items:center;">
+                <div style="font-weight:700; color:#333;">Total Inventory Cost: <span style="color:#2d3748;">₱<?= number_format($total_inventory_cost, 2) ?></span>
+                    <?php if (!$costColumnExists): ?>
+                        <div class="muted-text" style="margin-left:12px; color:#a00; font-weight:600; font-size:12px;">Cost data missing — add `cost_per_unit` column to `inventory` to enable totals.</div>
+                    <?php endif; ?>
+                </div>
+                <button class="btn-primary" onclick="refreshInventory()"><i class='bx bx-refresh'></i> Refresh</button>
+                <a class="btn-secondary" href="reports.php?export=inventory">Export CSV</a>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Item Code</th>
+                        <th>Item Name</th>
+                        <th>Category</th>
+                        <th>Unit</th>
+                        <th>Stock</th>
+                        <th>Cost / Unit</th>
+                        <th>Amount</th>
+                        <th>Reorder Level</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($inventory_list as $it): ?>
+                    <?php $amount = ($it['stock_qty'] ?? 0) * (float)($it['cost_per_unit'] ?? 0); ?>
+                    <tr>
+                        <td><a href="#" onclick="viewTransactions(<?= (int)$it['id'] ?>);return false;" style="font-weight:700;"><?= htmlspecialchars($it['item_code'] ?? '—') ?></a></td>
+                        <td><?= htmlspecialchars($it['item_name']) ?></td>
+                        <td><?= htmlspecialchars($it['category']) ?></td>
+                        <td><?= htmlspecialchars($it['unit'] ?? 'pcs') ?></td>
+                        <td><?= number_format($it['stock_qty'] ?? 0) ?></td>
+                        <td><?= number_format((float)($it['cost_per_unit'] ?? 0), 2) ?></td>
+                        <td><?= number_format($amount, 2) ?></td>
+                        <td><?= htmlspecialchars($it['reorder_level'] ?? '—') ?></td>
+                        <td><span class="badge <?= strtolower(str_replace(' ','',$it['status'] ?? 'sufficient')) ?>"><?= htmlspecialchars($it['status'] ?? 'Sufficient') ?></span></td>
+                        <td>
+                            <a href="#" class="action-link" onclick="viewTransactions(<?= (int)$it['id'] ?>);return false;">View Movements</a>
+                            <a href="#" class="action-link" onclick="showAddMovement(<?= (int)$it['id'] ?>, <?= json_encode($it['item_name']) ?>);return false;">Add</a>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
     <div class="content-card">
         <div class="card-header">
@@ -146,7 +254,7 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
                         <td><?= number_format($mov['quantity']) ?></td>
                         <td><?= number_format($mov['previous_quantity']) ?></td>
                         <td><?= number_format($mov['new_quantity']) ?></td>
-                        <td><?= ucfirst($mov['reference_type']) ?></td>
+                        <td><?= htmlspecialchars($mov['reference_number'] ?? ucfirst($mov['reference_type'])) ?></td>
                         <td><?= htmlspecialchars($mov['username'] ?? 'System') ?></td>
                         <td><?= htmlspecialchars($mov['remarks'] ?? '—') ?></td>
                     </tr>
@@ -155,11 +263,100 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
             </table>
         </div>
     </div>
+
+</div>
+
+<!-- Transactions Modal -->
+<div id="transactionsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="txnModalTitle">Transactions</h2>
+            <span class="close" onclick="closeModal('transactionsModal')">&times;</span>
+        </div>
+        <div style="padding:20px;">
+            <table class="data-table" id="transactionTable">
+                <thead>
+                    <tr><th>Date</th><th>Ref #</th><th>Particulars</th><th>In</th><th>Out</th><th>Balance</th><th>Unit Cost</th><th>Amount</th></tr>
+                </thead>
+                <tbody id="transactionTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Movement Modal -->
+<div id="movementModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="movModalTitle">Add Stock Movement</h2>
+            <span class="close" onclick="closeModal('movementModal')">&times;</span>
+        </div>
+        <div style="padding:20px;">
+            <form method="POST" action="inventory.php">
+                <input type="hidden" name="product_id" id="mov_product_id">
+                <div class="form-group">
+                    <label>Type</label>
+                    <select name="movement_type" required>
+                        <option value="in">In</option>
+                        <option value="out">Out</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantity</label>
+                    <input type="number" name="quantity" required min="1">
+                </div>
+                <div class="form-group">
+                    <label>Reference Number</label>
+                    <input type="text" name="reference_number" placeholder="PO-0001 / INV-0001">
+                </div>
+                <div class="form-group">
+                    <label>Remarks</label>
+                    <textarea name="remarks" rows="3" placeholder="Optional remarks"></textarea>
+                </div>
+                <div style="text-align:right;">
+                    <button type="button" class="btn-secondary" onclick="closeModal('movementModal')">Cancel</button>
+                    <button type="submit" class="btn-primary">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 
 <script>
-function showAddMovement() {
-    alert('Add Stock Movement - Feature coming soon!');
+function closeModal(id){ document.getElementById(id).style.display = 'none'; }
+function openModal(id){ document.getElementById(id).style.display = 'block'; }
+
+function viewTransactions(itemId){
+    fetch('inventory.php?action=fetch_transactions&item_id='+encodeURIComponent(itemId))
+    .then(res => res.json())
+    .then(data => {
+        if(!data.success){ alert('No transactions or item not found'); return; }
+        document.getElementById('txnModalTitle').innerText = data.item_code + ' — ' + data.item_name;
+        var body = document.getElementById('transactionTableBody');
+        body.innerHTML = '';
+        data.transactions.forEach(t => {
+            var tr = document.createElement('tr');
+            tr.innerHTML = '<td>'+t.date+'</td><td>'+t.ref_num+'</td><td>'+t.particulars+'</td><td style="text-align:right">'+(t.in||'')+'</td><td style="text-align:right">'+(t.out||'')+'</td><td style="text-align:right">'+t.balance+'</td><td style="text-align:right">'+t.unit_cost+'</td><td style="text-align:right">'+t.amount+'</td>';
+            body.appendChild(tr);
+        });
+        openModal('transactionsModal');
+    }).catch(e=>{ console.error(e); alert('Failed to fetch transactions.') });
+}
+
+function showAddMovement(productId, itemName){
+    if(productId){ document.getElementById('mov_product_id').value = productId; }
+    document.getElementById('movModalTitle').innerText = 'Add Stock Movement' + (itemName ? ' — '+itemName : '');
+    openModal('movementModal');
+}
+
+function refreshInventory(){ location.reload(); }
+
+// Close modals when clicking outside modal content
+window.onclick = function(e){
+    var tx = document.getElementById('transactionsModal');
+    var mv = document.getElementById('movementModal');
+    if(e.target == tx) tx.style.display='none';
+    if(e.target == mv) mv.style.display='none';
 }
 </script>
 

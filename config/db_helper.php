@@ -246,4 +246,15 @@ function check_db_connection() {
     global $conn;
     return $conn->ping();
 }
+
+/**
+ * Check if a column exists in a table
+ */
+function column_exists($table, $column) {
+    global $conn;
+    $table = $conn->real_escape_string($table);
+    $column = $conn->real_escape_string($column);
+    $res = $conn->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
+    return ($res && $res->num_rows > 0);
+}
 ?>

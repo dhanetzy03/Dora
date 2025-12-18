@@ -44,39 +44,14 @@ mysql -u root -p < database/shukran_cafe.sql
 
 The database connection is configured in:
 ```
-config/db_connect.php
-```
-
-Default settings:
-- Server: `localhost`
-- Username: `root`
-- Password: `` (empty)
-- Database: `shukran_cafe`
-
----
-
 ## Default Credentials
 
 ### Admin Account
 - **Username:** `admin`
 - **Password:** `admin123`
-- **Email:** `admin@shukrancafe.com`
-
-> ⚠️ **IMPORTANT:** Please change the default password after first login!
-
----
-
-## Backend Connection Files
-
-### 1. Database Connection
-**File:** `config/db_connect.php`
-- Basic MySQL connection setup
-- Used by all PHP files
-
 ### 2. Database Helper Functions
-**File:** `config/db_helper.php`
+ `get_current_user_data()` - Get current user info
 
-Available functions:
 - `db_query()` - Execute prepared statements
 - `db_fetch_one()` - Fetch single row
 - `db_fetch_all()` - Fetch all rows
@@ -89,7 +64,7 @@ Available functions:
 - `sanitize_input()` - Input sanitization
 - `generate_transaction_number()` - Generate unique transaction IDs
 
-### 3. Session Management
+$current_user = get_current_user_data();
 **File:** `config/session.php`
 
 Available functions:

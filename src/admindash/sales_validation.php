@@ -125,80 +125,69 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-store, must-revalidate">
 <title>Sales Validation - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<link rel="stylesheet" href="../styles/admin-style.css">
+<!-- Inline full admin CSS to prevent FOUC on first load -->
 <style>
-/* Basic Modal Styles */
-.modal {
-    display: none; 
-    position: fixed; 
-    z-index: 1000; 
-    left: 0;
-    top: 0;
-    width: 100%; 
-    height: 100%; 
-    overflow: auto; 
-    background-color: rgba(0,0,0,0.4); 
+body.shukran-admin * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
-.modal-content {
-    background-color: #fefefe;
-    margin: 5% auto; 
-    padding: 25px; 
-    border: 1px solid #888;
-    width: 95%; 
-    max-width: 1200px; 
-    border-radius: 8px;
-    box-shadow: 0 4px 12px 0 rgba(0,0,0,0.3); 
-}
-.close {
-    color: #aaa;
-    float: right;
-    font-size: 30px; 
-    font-weight: bold;
-    cursor: pointer;
-}
-.close:hover, .close:focus {
-    color: #000;
+body.shukran-admin {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f7fa;
+    display: flex;
+    min-height: 100vh;
 }
 
-/* --- Table Spacing & Alignment --- */
-
-/* Apply more padding to all table cells inside the modal AND main tables */
-.data-table th, 
-.data-table td {
-    padding: 10px 12px; 
-    text-align: left;
-    white-space: nowrap; 
+/* Sidebar Styles */
+.sidebar {
+    width: 260px;
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    color: white;
+    padding: 0;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 1002;
+    transition: transform 0.25s ease, width 0.25s ease;
 }
 
-/* Specific alignment for numerical columns in the MODAL (#transactionTable):
-   1: DATE, 2: ORDER NO., 3: QUANTITY, 4: UNIT COST, 5: MARK UP, 6: SELLING PRICE, 7: TOTAL SALES
-*/
-#transactionTable td:nth-child(3), /* QUANTITY */
-#transactionTable td:nth-child(4), /* UNIT COST */
-#transactionTable td:nth-child(5), /* MARK UP */
-#transactionTable td:nth-child(6), /* SELLING PRICE */
-#transactionTable td:nth-child(7)  /* TOTAL SALES */
-{
-    text-align: right;
+/* Sidebar header / toggle */
+.sidebar-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 
-/* Alignment for numerical columns in the PENDING SALES summary table: */
-.data-table:not(#transactionTable) tbody tr td:nth-child(6) /* SELLING PRICE/Total Amount */
-{
-    text-align: right;
-}
-
-/* Style for the editable markup input field */
+...css truncated for brevity...
+</style>
+<!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
+<link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+<script>
+// Apply sidebar state BEFORE body renders to prevent layout shift
+// DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
+(function(){
+    var storedState = localStorage.getItem('sidebarCollapsed');
+    // Only collapse if explicitly set to 'true' in localStorage
+    if (storedState === 'true') {
+        document.documentElement.classList.add('sidebar-will-collapse');
+    }
+    // Otherwise default is expanded (no class needed)
+})();
+</script>
+<!-- Inline full admin CSS to prevent FOUC on first load -->
+<style>
+/* Additional Sales Validation Styles */
 .markup-input {
-    width: 50px;
-    text-align: right;
-    border: 1px solid #ccc;
-    padding: 4px 6px; 
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
     border-radius: 4px;
-    transition: all 0.2s;
+    font-size: 14px;
 }
+
 .markup-input:focus {
     border-color: #007bff;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
@@ -207,9 +196,24 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
 .markup-cell {
     white-space: nowrap;
 }
+
+.text-center {
+    text-align: center;
+}
+
+.alert-success {
+    margin: 15px 30px;
+    padding: 15px;
+    background: #d4edda;
+    color: #155724;
+    border-radius: 8px;
+    border-left: 4px solid #28a745;
+}
 </style>
+<!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
+<link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
 </head>
-<body>
+<body class="shukran-admin">
 
 <?php include 'sidebar.php'; ?>
 
@@ -223,21 +227,21 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
     </div>
 
     <?php if (isset($_GET['msg']) && $_GET['msg'] == 'validated'): ?>
-    <div style="margin: 20px 30px; padding: 15px; background: #d4edda; color: #155724; border-radius: 8px;">
+    <div class="alert-success">
         ✅ Sale validated successfully!
     </div>
     <?php endif; ?>
 
     <div class="stats-grid">
         <div class="stat-card">
-            <div class="stat-icon" style="background: #fff3cd;"><i class='bx bx-time' style="color: #856404;"></i></div>
+            <div class="stat-icon bg-warning-light"><i class='bx bx-time icon-warning'></i></div>
             <div class="stat-info">
                 <h3><?= $total_pending ?></h3>
                 <p>Pending Validation</p>
             </div>
         </div>
         <div class="stat-card">
-            <div class="stat-icon" style="background: #d4edda;"><i class='bx bx-check-circle' style="color: #155724;"></i></div>
+            <div class="stat-icon bg-success-light"><i class='bx bx-check-circle icon-success'></i></div>
             <div class="stat-info">
                 <h3><?= $total_validated ?></h3>
                 <p>Total Validated</p>
@@ -264,7 +268,7 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
                 </thead>
                 <tbody>
                     <?php if (empty($pending_sales)): ?>
-                    <tr><td colspan="7" style="text-align: center; padding: 30px; color: #999;">No pending sales to validate</td></tr>
+                    <tr><td colspan="7" class="empty-message">No pending sales to validate</td></tr>
                     <?php else: ?>
                     <?php foreach ($pending_sales as $sale): ?>
                     <tr>
@@ -274,10 +278,9 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
                         <td>-</td>
                         <td><span class="badge badge-warning">Pending</span></td>
                         <td><strong>₱<?= number_format($sale['total_amount'], 2) ?></strong></td>
-                        <td style="text-align: center;">
-                            <button class="btn-primary" 
+                        <td class="text-center">
+                            <button class="btn-primary btn-sm" 
                                 onclick="showDetailsModal(<?= $sale['sale_id'] ?>, '<?= htmlspecialchars($sale['sale_number']) ?>', '<?= date('M d, Y', strtotime($sale['sale_date'])) ?>')" 
-                                style="padding: 6px 12px; font-size: 12px;"
                                 title="Review and Validate">
                                 <i class='bx bx-search-alt'></i> Review
                             </button>
@@ -331,7 +334,7 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
         <h2 id="modalTitle">Transaction Details</h2>
         <input type="hidden" id="currentSaleId">
 
-        <div class="table-responsive" style="margin-top: 20px;">
+        <div class="table-responsive table-margin-top">
             <table class="data-table" id="transactionTable">
                 <thead>
                     <tr>
@@ -345,14 +348,14 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales WHERE status='c
                     </tr>
                 </thead>
                 <tbody id="transactionBody">
-                    <tr><td colspan="7" style="text-align: center;">Loading transaction items...</td></tr>
+                    <tr><td colspan="7" class="empty-message">Loading transaction items...</td></tr>
                 </tbody>
             </table>
         </div>
         
-        <div style="text-align: right; margin-top: 20px;">
+        <div class="text-right table-margin-top" style="margin-top:0;">
             <button class="btn-secondary" onclick="closeDetailsModal()">Close Review</button>
-            <form id="validationForm" method="POST" action="" style="display: inline-block;">
+            <form id="validationForm" method="POST" action="" class="inline-form">
                 <input type="hidden" name="sale_id" id="validationSaleId">
                 <button type="submit" name="validate_sale" class="btn-primary">
                     <i class='bx bx-check-circle'></i> Mark as Validated
@@ -377,7 +380,7 @@ function showDetailsModal(saleId, saleNumber, saleDate) {
     document.getElementById('validationSaleId').value = saleId;
 
     title.innerText = `Transaction Details for Sale #${saleNumber}`;
-    tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">Loading transaction items...</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="7" class="empty-message">Loading transaction items...</td></tr>';
     modal.style.display = 'block';
 
     fetch(`sales_validation.php?action=fetch_sale_items&sale_id=${saleId}`)
@@ -413,13 +416,13 @@ function showDetailsModal(saleId, saleNumber, saleDate) {
                     `;
                     tableBody.innerHTML += row;
                 });
-            } else {
-                 tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">No item details found for this sale.</td></tr>';
-            }
+              } else {
+                  tableBody.innerHTML = '<tr><td colspan="7" class="empty-message">No item details found for this sale.</td></tr>';
+              }
         })
         .catch(error => {
             console.error('Error fetching transactions:', error);
-            tableBody.innerHTML = '<tr><td colspan="7" style="text-align: center;">An error occurred while fetching data.</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="7" class="empty-message">An error occurred while fetching data.</td></tr>';
         });
 }
 
