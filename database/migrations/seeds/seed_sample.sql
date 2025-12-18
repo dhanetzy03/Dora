@@ -16,13 +16,19 @@ ON DUPLICATE KEY UPDATE category_name = VALUES(category_name);
 -- Capture category ids
 SET @cat_ingredients = (SELECT category_id FROM categories WHERE category_name = 'Ingredients' LIMIT 1);
 SET @cat_beverages = (SELECT category_id FROM categories WHERE category_name = 'Beverages' LIMIT 1);
+SET @cat_supplies = (SELECT category_id FROM categories WHERE category_name = 'Supplies' LIMIT 1);
 
 -- Suppliers
 INSERT INTO `suppliers` (`supplier_name`, `contact`, `email`, `address`) VALUES
 ('Main Supplier','Juan Dela Cruz','supplier@example.com','123 Market St'),
-('Bakery Supplies Co.','Maria Santos','bakery@supplies.com','45 Baker St')
-ON DUPLICATE KEY UPDATE supplier_name = VALUES(supplier_name);
+('Bakery Supplies Co.','Maria Santos','bakery@supplies.com','45 Baker St'),
+('Dairy Supplier','Jose Ramos','dairy@supplies.com','88 Farm Rd'),
+('Packaging Co.','Ana Lopez','packaging@example.com','10 Pack Ln')
+ON DUPLICATE KEY UPDATE contact = VALUES(contact), email = VALUES(email), address = VALUES(address);
 SET @supp_main = (SELECT supplier_id FROM suppliers WHERE supplier_name = 'Main Supplier' LIMIT 1);
+SET @supp_bakery = (SELECT supplier_id FROM suppliers WHERE supplier_name = 'Bakery Supplies Co.' LIMIT 1);
+SET @supp_dairy = (SELECT supplier_id FROM suppliers WHERE supplier_name = 'Dairy Supplier' LIMIT 1);
+SET @supp_pack = (SELECT supplier_id FROM suppliers WHERE supplier_name = 'Packaging Co.' LIMIT 1);
 
 -- Products (AS PACK sample)
 INSERT INTO `products` (`product_code`, `product_name`, `description`, `category_id`, `unit`, `reorder_level`, `status`)
@@ -30,7 +36,7 @@ VALUES
 ('COF-PACK','Coffee Beans (AS PACK)','Roasted coffee beans sold per pack', @cat_ingredients, 'pack', 5, 'active'),
 ('SUGAR-1KG','Sugar 1kg','Sugar 1 kilogram pack', @cat_ingredients, 'pack', 10, 'active'),
 ('MILK-1L','Fresh Milk 1L','Pasteurized fresh milk', @cat_beverages, 'ltr', 10, 'active'),
-('PAPER-CUP-12oz','Paper Cup 12oz','Disposable paper cup 12oz', @cat_beverages, 'pcs', 200, 'active')
+('PAPER-CUP-12oz','Paper Cup 12oz','Disposable paper cup 12oz', @cat_supplies, 'pcs', 200, 'active')
 ON DUPLICATE KEY UPDATE product_name = VALUES(product_name);
 
 SET @prod_cof = (SELECT product_id FROM products WHERE product_code = 'COF-PACK' LIMIT 1);
@@ -45,7 +51,7 @@ VALUES
 ('COF-PACK','Coffee Beans (AS PACK)','Ingredients', 50, 500.00, 5, 'Sufficient', 'pack', 50, 0, @cat_ingredients),
 ('SUGAR-1KG','Sugar 1kg (pack)','Ingredients', 30, 60.00, 5, 'Sufficient', 'pack', 30, 0, @cat_ingredients),
 ('MILK-1L','Fresh Milk 1L','Beverages', 20, 80.00, 5, 'Sufficient', 'ltr', 20, 0, @cat_beverages),
-('PAPER-CUP-12oz','Paper Cup 12oz','Supplies', 500, 2.50, 100, 'Sufficient', 'pcs', 500, 0, @cat_beverages),
+('PAPER-CUP-12oz','Paper Cup 12oz','Supplies', 500, 2.50, 100, 'Sufficient', 'pcs', 500, 0, @cat_supplies),
 ('SUGAR-BULK','Sugar Bulk (kg)','Ingredients', 120, 40.00, 20, 'Sufficient', 'kg', 120, 0, @cat_ingredients)
 ;
 
