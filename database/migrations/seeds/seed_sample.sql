@@ -24,7 +24,7 @@ INSERT INTO `suppliers` (`supplier_name`, `contact`, `email`, `address`) VALUES
 ('Bakery Supplies Co.','Maria Santos','bakery@supplies.com','45 Baker St'),
 ('Dairy Supplier','Jose Ramos','dairy@supplies.com','88 Farm Rd'),
 ('Packaging Co.','Ana Lopez','packaging@example.com','10 Pack Ln')
-ON DUPLICATE KEY UPDATE contact = VALUES(contact), email = VALUES(email), address = VALUES(address);
+ON DUPLICATE KEY UPDATE supplier_name = VALUES(supplier_name);
 SET @supp_main = (SELECT supplier_id FROM suppliers WHERE supplier_name = 'Main Supplier' LIMIT 1);
 SET @supp_bakery = (SELECT supplier_id FROM suppliers WHERE supplier_name = 'Bakery Supplies Co.' LIMIT 1);
 SET @supp_dairy = (SELECT supplier_id FROM suppliers WHERE supplier_name = 'Dairy Supplier' LIMIT 1);
