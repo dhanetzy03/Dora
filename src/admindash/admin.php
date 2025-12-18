@@ -7,10 +7,11 @@ if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     exit();
 }
 
-// Redirect to the new dashboard
-header("Location: dashboard.php");
-exit();
-?>
+// Include DB connection
+require_once __DIR__ . '/../../config/db_connect.php';
+
+$error = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $item_name = trim($_POST['item_name']);
     $category = trim($_POST['category']);
@@ -25,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $check->execute();
     $result = $check->get_result();
 
-    if ($result->num_rows > 0) {
-        // ✅ Item exists — update stock and keep reorder level if not changed
+    if ($result && $result->num_rows > 0) {
+        // Item exists — update stock and keep reorder level if not changed
         $item = $result->fetch_assoc();
         $new_stock = $item['stock_qty'] + $stock_qty;
         $reorder_level_final = $reorder_level ?? $item['reorder_level'];
@@ -35,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Determine status
         if ($new_stock <= 0) {
             $status = "Out of Stock";
-        } elseif ($new_stock <= $reorder_level_final) {
+        } elseif ($reorder_level_final !== null && $new_stock <= $reorder_level_final) {
             $status = "Low Stock";
         } else {
             $status = "Sufficient";
@@ -55,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
 
     } else {
-        // ❌ New item — reorder level is required
+        // New item — reorder level is required
         if ($reorder_level === null) {
             $error = "⚠️ Please enter a reorder level for new items.";
         } else {
@@ -63,8 +64,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ? "Out of Stock"
                 : (($stock_qty <= $reorder_level) ? "Low Stock" : "Sufficient");
             $stmt = $conn->prepare("INSERT INTO inventory (item_name, category, stock_qty, reorder_level, status, unit, stock_in, stock_out, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $stock_in = $stock_qty;
             $stock_out = 0;
-            $stmt->bind_param("ssisssii", $item_name, $category, $stock_qty, $reorder_level, $status, $unit, $stock_qty, $stock_out);
+            $stmt->bind_param("ssiissii", $item_name, $category, $stock_qty, $reorder_level, $status, $unit, $stock_in, $stock_out);
             $stmt->execute();
             $stmt->close();
             header("Location: admin.php");
@@ -72,16 +74,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $check->close();
+    if ($check) {
+        $check->close();
+    }
 }
 
 // --- Fetch Inventory Items ---
 $result = $conn->query("SELECT * FROM inventory ORDER BY id DESC");
-$inventory = $result->fetch_all(MYSQLI_ASSOC);
+$inventory = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 
 // --- Dashboard Stats ---
 $totalItems = count($inventory);
-$criticalItems = $conn->query("SELECT COUNT(*) AS c FROM inventory WHERE status = 'Low Stock' OR status = 'Out of Stock'")->fetch_assoc()['c'];
+$criticalItems = $conn->query("SELECT COUNT(*) AS c FROM inventory WHERE status = 'Low Stock' OR status = 'Out of Stock'")->fetch_assoc()['c'] ?? 0;
 $recentChanges = $conn->query("SELECT COUNT(*) AS c FROM inventory WHERE DATE(last_updated) = CURDATE()")->fetch_assoc()['c'] ?? 0;
 ?>
 
