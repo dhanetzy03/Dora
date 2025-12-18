@@ -596,8 +596,8 @@ body.collapsed .main {
     <div class="top-bar">
         <h1>Dashboard Overview</h1>
         <div class="user-info">
-            <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span>
-            <a href="../auth/logout.php" class="btn-logout">Logout</a>
+            <!-- <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span> -->
+            <!-- <a href="../auth/logout.php" class="btn-logout">Logout</a> -->
         </div>
     </div>
 

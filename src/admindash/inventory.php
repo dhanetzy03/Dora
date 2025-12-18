@@ -225,18 +225,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
             // EDIT/UPDATE LOGIC
             // NOTE: stock_qty is not included in the UPDATE since it should be managed by the Movement Modal for logging integrity.
             if ($hasCost) {
-                $sql = "UPDATE inventory SET item_code = ?, item_name = ?, category = ?, unit = ?, cost_per_unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
+                $sql = "UPDATE inventory SET item_name = ?, category = ?, unit = ?, cost_per_unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
                 $stmt = $conn->prepare($sql);
                 if ($stmt) {
-                    $stmt->bind_param("ssssdisi", $item_code, $item_name, $category, $unit, $cost_per_unit, $reorder_level, $status, $item_id);
+                    $stmt->bind_param("sssidii", $item_name, $category, $unit, $cost_per_unit, $reorder_level, $status, $item_id);
                     $stmt->execute();
                     $stmt->close();
                 }
             } else {
-                $sql = "UPDATE inventory SET item_code = ?, item_name = ?, category = ?, unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
+                $sql = "UPDATE inventory SET item_name = ?, category = ?, unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
                 $stmt = $conn->prepare($sql);
                 if ($stmt) {
-                    $stmt->bind_param("sssssii", $item_code, $item_name, $category, $unit, $reorder_level, $status, $item_id);
+                    $stmt->bind_param("sssiii", $item_name, $category, $unit, $reorder_level, $status, $item_id);
                     $stmt->execute();
                     $stmt->close();
                 }
@@ -245,10 +245,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
         } else {
             // ADD LOGIC (Original)
             if ($hasCost) {
-                $sql = "INSERT INTO inventory (item_code, item_name, category, unit, stock_qty, cost_per_unit, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+                $sql = "INSERT INTO inventory (item_name, category, unit, stock_qty, cost_per_unit, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
                 $stmt = $conn->prepare($sql);
                 if ($stmt) {
-                    $stmt->bind_param("ssssdiis", $item_code, $item_name, $category, $unit, $stock_qty, $cost_per_unit, $reorder_level, $status);
+                    $stmt->bind_param("sssidii", $item_name, $category, $unit, $stock_qty, $cost_per_unit, $reorder_level, $status);
                     if ($stmt->execute()) {
                         // SUCCESS LOGIC REMOVED
                     } else {
@@ -260,10 +260,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
                 }
             } else {
                 // Fallback when database does not have cost_per_unit
-                $sql = "INSERT INTO inventory (item_code, item_name, category, unit, stock_qty, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+                $sql = "INSERT INTO inventory (item_name, category, unit, stock_qty, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, NOW())";
                 $stmt = $conn->prepare($sql);
                 if ($stmt) {
-                    $stmt->bind_param("sssiiss", $item_code, $item_name, $category, $unit, $stock_qty, $reorder_level, $status);
+                    $stmt->bind_param("sssiis", $item_name, $category, $unit, $stock_qty, $reorder_level, $status);
                     if ($stmt->execute()) {
                         // SUCCESS LOGIC REMOVED
                     } else {
@@ -641,24 +641,29 @@ data truncated for brevity (same CSS)
 .modal {
     display: none; 
     position: fixed; 
-    z-index: 1000; 
+    z-index: 3000; 
     left: 0;
     top: 0;
     width: 100%; 
     height: 100%; 
-    overflow: auto; 
-    background-color: rgba(0,0,0,0.4); 
+    background-color: rgba(0,0,0,0.45);
+    /* Use flex container when visible so content can be perfectly centered */
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
 }
 
 .modal-content {
     background-color: #fefefe;
-    margin: 10% auto; 
+    margin: 0 auto; 
     padding: 20px;
     border: 1px solid #888;
-    width: 80%; 
-    max-width: 500px;
+    width: 100%; 
+    max-width: 900px;
     border-radius: 8px;
-    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2), 0 6px 20px 0 rgba(0,0,0,0.19);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    overflow: auto;
 }
 /* NEW STYLE: Style for the new log modal to be wider */
 #logModal .modal-content {
@@ -690,10 +695,28 @@ data truncated for brevity (same CSS)
 
 /* FIX: Ensure table actions are clickable */
 .data-table td:last-child {
-    /* Ensures the cell containing the actions button is positioned correctly */
-    position: relative; 
-    z-index: 10; /* Ensures buttons are on top of any potential background elements */
+    /* Center action buttons; delete button will be pushed to the right with margin-left:auto */
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
+
+/* Place delete button to the far right of the actions cell without absolute positioning */
+.data-table td:last-child .delete-icon {
+    margin-left: auto;
+    position: relative;
+    background: transparent;
+    border: none;
+    padding: 6px;
+}
+
+/* Remove default focus outline for icon buttons */
+.btn-icon:focus { outline: none; box-shadow: none; }
+
+/* Ensure delete icon color */
+.data-table td:last-child .delete-icon i { color: #f44336; }
 
 /* Optional: Ensure icon buttons are visually distinct and interactive */
 .btn-icon {
@@ -716,6 +739,36 @@ data truncated for brevity (same CSS)
 /* Style for delete button icon */
 .delete-icon {
     color: #f44336; /* Red color for delete */
+}
+
+/* Form layout improvements for modals */
+.form-row {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+.label-normal {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* Modal footer buttons alignment */
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 12px;
+}
+
+/* Ensure inputs inside modal take full width where intended */
+.modal .form-group input[type="text"],
+.modal .form-group input[type="number"],
+.modal .form-group textarea, .modal .form-group select {
+    width: 100%;
+    box-sizing: border-box;
 }
 </style>
 </head>
@@ -847,7 +900,7 @@ data truncated for brevity (same CSS)
                             <button class="btn-icon" title="Edit Item Details"
                                 onclick="showEditModal(
                                     <?= $item_id ?>, 
-                                    '<?= htmlspecialchars($item['item_code']) ?>', 
+                                    '<?= htmlspecialchars($item['item_code'] ?? '') ?>', 
                                     '<?= htmlspecialchars($item['item_name']) ?>', 
                                     '<?= htmlspecialchars($item['category']) ?>', 
                                     '<?= htmlspecialchars($item['unit']) ?>', 
@@ -860,10 +913,12 @@ data truncated for brevity (same CSS)
                                 onclick="showMovementModal(<?= $item_id ?>, '<?= htmlspecialchars($item['item_name']) ?>', <?= $stock_qty ?>)">
                                 <i class='bx bx-log-in-circle'></i>
                             </button>
-                            <a href="?delete_id=<?= $item_id ?>" 
-                               onclick="return confirm('Are you sure you want to permanently remove <?= htmlspecialchars($item['item_name']) ?>? This action cannot be undone.');">
-                                                <button class="btn-icon delete-icon" title="Remove Item" onclick="return confirm('Delete this item?')"><i class='bx bx-trash'></i></button>
-                            </a>
+                                     <a href="?delete_id=<?= $item_id ?>" 
+                                         class="btn-icon delete-icon"
+                                         title="Remove Item"
+                                         onclick="return confirm('Are you sure you want to permanently remove <?= htmlspecialchars($item['item_name']) ?>? This action cannot be undone.');">
+                                          <i class='bx bx-trash'></i>
+                                     </a>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -948,8 +1003,8 @@ data truncated for brevity (same CSS)
             <div class="form-group">
                 <label>Movement Type</label>
                 <div class="form-row form-gap">
-                    <label class="label-normal"><input type="radio" name="movement_type" value="in" required> Stock In (Add)</label>
-                    <label class="label-normal">Stock Out (Remove) <input type="radio" name="movement_type" value="out" required checked></label>
+                    <label class="label-normal"><input type="radio" name="movement_type" value="in" required> <span>Stock In (Add)</span></label>
+                    <label class="label-normal"><input type="radio" name="movement_type" value="out" required checked> <span>Stock Out (Remove)</span></label>
                 </div>
             </div>
             
@@ -1069,7 +1124,7 @@ data truncated for brevity (same CSS)
 </div>
 <script>
 function showAddModal() {
-    document.getElementById('addModal').style.display = 'block';
+    document.getElementById('addModal').style.display = 'flex';
 }
 function closeAddModal() {
     document.getElementById('addModal').style.display = 'none';
@@ -1084,7 +1139,7 @@ function showMovementModal(itemId, itemName, currentStock) {
     // FIX: Clear reference and remarks fields on open
     document.querySelector('#movementModal input[name="reference_number"]').value = '';
     document.querySelector('#movementModal input[name="remarks"]').value = '';
-    document.getElementById('movementModal').style.display = 'block';
+    document.getElementById('movementModal').style.display = 'flex';
 }
 function closeMovementModal() {
     document.getElementById('movementModal').style.display = 'none';
@@ -1101,7 +1156,7 @@ function showEditModal(id, code, name, category, unit, cost, reorder) {
     document.getElementById('editCostPerUnit').value = cost.toFixed(2); // Format cost
     document.getElementById('editReorderLevel').value = reorder;
     
-    document.getElementById('editModal').style.display = 'block';
+    document.getElementById('editModal').style.display = 'flex';
 }
 
 function closeEditModal() {
@@ -1119,7 +1174,7 @@ function showLogModal(itemId) {
     
     // Show modal immediately with loading message
     tableBody.innerHTML = '<tr><td colspan="9" class="empty-message">Loading transactions...</td></tr>';
-    logModal.style.display = 'block';
+    logModal.style.display = 'flex';
 
     // Fetch data via AJAX
     fetch(`inventory.php?action=fetch_transactions&item_id=${itemId}`)

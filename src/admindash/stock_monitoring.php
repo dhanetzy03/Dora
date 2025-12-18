@@ -101,6 +101,23 @@ body.shukran-admin {
 </style>
 <!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
 <link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+<style>
+/* Ensure modals center correctly when shown (left as display:none by default).
+   JS will set display:flex when opening so align-items/justify-content apply. */
+.modal {
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+}
+.modal .modal-content {
+    max-width: 900px;
+    width: 100%;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    max-height: 90vh;
+    overflow: auto;
+}
+</style>
 <script>
 // Apply sidebar state BEFORE body renders to prevent layout shift
 // DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
@@ -324,7 +341,12 @@ body.shukran-admin {
 
 <script>
 function closeModal(id){ document.getElementById(id).style.display = 'none'; }
-function openModal(id){ document.getElementById(id).style.display = 'block'; }
+function openModal(id){
+    // Use flex display so CSS centering (align-items/justify-content) applies
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.style.display = 'flex';
+}
 
 function viewTransactions(itemId){
     fetch('inventory.php?action=fetch_transactions&item_id='+encodeURIComponent(itemId))

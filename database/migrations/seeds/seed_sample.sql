@@ -19,7 +19,7 @@ SET @cat_beverages = (SELECT category_id FROM categories WHERE category_name = '
 SET @cat_supplies = (SELECT category_id FROM categories WHERE category_name = 'Supplies' LIMIT 1);
 
 -- Suppliers
-INSERT INTO `suppliers` (`supplier_name`, `contact`, `email`, `address`) VALUES
+INSERT INTO `suppliers` (`supplier_name`, `contact_person`, `email`, `address`) VALUES
 ('Main Supplier','Juan Dela Cruz','supplier@example.com','123 Market St'),
 ('Bakery Supplies Co.','Maria Santos','bakery@supplies.com','45 Baker St'),
 ('Dairy Supplier','Jose Ramos','dairy@supplies.com','88 Farm Rd'),
@@ -46,19 +46,19 @@ SET @prod_cup = (SELECT product_id FROM products WHERE product_code = 'PAPER-CUP
 
 -- Inventory (admin-facing inventory table) with category mapping
 -- Added `item_code` and `cost_per_unit` to improve seeded data
-INSERT INTO `inventory` (`item_code`,`item_name`, `category`, `stock_qty`, `cost_per_unit`, `reorder_level`, `status`, `unit`, `stock_in`, `stock_out`, `category_id`)
+INSERT INTO `inventory` (`item_name`, `category`, `stock_qty`, `cost_per_unit`, `reorder_level`, `status`, `unit`, `stock_in`, `stock_out`, `category_id`)
 VALUES
-('COF-PACK','Coffee Beans (AS PACK)','Ingredients', 50, 500.00, 5, 'Sufficient', 'pack', 50, 0, @cat_ingredients),
-('SUGAR-1KG','Sugar 1kg (pack)','Ingredients', 30, 60.00, 5, 'Sufficient', 'pack', 30, 0, @cat_ingredients),
-('MILK-1L','Fresh Milk 1L','Beverages', 20, 80.00, 5, 'Sufficient', 'ltr', 20, 0, @cat_beverages),
-('PAPER-CUP-12oz','Paper Cup 12oz','Supplies', 500, 2.50, 100, 'Sufficient', 'pcs', 500, 0, @cat_supplies),
-('SUGAR-BULK','Sugar Bulk (kg)','Ingredients', 120, 40.00, 20, 'Sufficient', 'kg', 120, 0, @cat_ingredients)
+('Coffee Beans (AS PACK)','Ingredients', 50, 500.00, 5, 'Sufficient', 'pack', 50, 0, @cat_ingredients),
+('Sugar 1kg (pack)','Ingredients', 30, 60.00, 5, 'Sufficient', 'pack', 30, 0, @cat_ingredients),
+('Fresh Milk 1L','Beverages', 20, 80.00, 5, 'Sufficient', 'ltr', 20, 0, @cat_beverages),
+('Paper Cup 12oz','Supplies', 500, 2.50, 100, 'Sufficient', 'pcs', 500, 0, @cat_supplies),
+('Sugar Bulk (kg)','Ingredients', 120, 40.00, 20, 'Sufficient', 'kg', 120, 0, @cat_ingredients)
 ;
 
-SET @inv_cof = (SELECT id FROM inventory WHERE item_code = 'COF-PACK' LIMIT 1);
-SET @inv_sugar = (SELECT id FROM inventory WHERE item_code = 'SUGAR-1KG' LIMIT 1);
-SET @inv_milk = (SELECT id FROM inventory WHERE item_code = 'MILK-1L' LIMIT 1);
-SET @inv_cup = (SELECT id FROM inventory WHERE item_code = 'PAPER-CUP-12oz' LIMIT 1);
+SET @inv_cof = (SELECT id FROM inventory WHERE item_name = 'Coffee Beans (AS PACK)' LIMIT 1);
+SET @inv_sugar = (SELECT id FROM inventory WHERE item_name = 'Sugar 1kg (pack)' LIMIT 1);
+SET @inv_milk = (SELECT id FROM inventory WHERE item_name = 'Fresh Milk 1L' LIMIT 1);
+SET @inv_cup = (SELECT id FROM inventory WHERE item_name = 'Paper Cup 12oz' LIMIT 1);
 
 -- Stock table (current stock per product)
 INSERT INTO `stock` (`product_id`, `quantity`) VALUES

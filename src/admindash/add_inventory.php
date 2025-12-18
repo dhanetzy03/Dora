@@ -62,6 +62,40 @@ if ($result && $result->num_rows > 0) {
         back('error', 'Failed to update existing item.');
     }
 
+    // Sync updated inventory to products.stock if a matching product exists
+    $syncName = $item_name;
+    if (!empty($syncName)) {
+        $prodStmt = $conn->prepare("SELECT product_id FROM products WHERE product_name = ? LIMIT 1");
+        $prodStmt->bind_param("s", $syncName);
+        $prodStmt->execute();
+        $prodRes = $prodStmt->get_result();
+        if ($prodRes && $prodRes->num_rows > 0) {
+            $prodId = $prodRes->fetch_assoc()['product_id'];
+            $prodStmt->close();
+            // set stock equal to new_stock
+            $s2 = $conn->prepare("SELECT stock_id FROM stock WHERE product_id = ? LIMIT 1");
+            $s2->bind_param("i", $prodId);
+            $s2->execute();
+            $sr2 = $s2->get_result();
+            if ($sr2 && $sr2->num_rows > 0) {
+                $sid2 = $sr2->fetch_assoc()['stock_id'];
+                $s2->close();
+                $u2 = $conn->prepare("UPDATE stock SET quantity = ?, last_updated = NOW() WHERE stock_id = ?");
+                $u2->bind_param("ii", $new_stock, $sid2);
+                $u2->execute();
+                $u2->close();
+            } else {
+                $s2->close();
+                $ins2 = $conn->prepare("INSERT INTO stock (product_id, quantity, last_updated) VALUES (?, ?, NOW())");
+                $ins2->bind_param("ii", $prodId, $new_stock);
+                $ins2->execute();
+                $ins2->close();
+            }
+        } else {
+            $prodStmt->close();
+        }
+    }
+
 } else {
     // New item: reorder level is required
     if ($reorder_level === null) {
@@ -79,6 +113,40 @@ if ($result && $result->num_rows > 0) {
         back('success', 'New item added to inventory.');
     } else {
         back('error', 'Failed to add new item.');
+    }
+}
+
+// After adding new inventory item, sync to products.stock when names match
+$syncName = $item_name;
+$syncQty = $stock_qty;
+if (!empty($syncName)) {
+    $prodStmt = $conn->prepare("SELECT product_id FROM products WHERE product_name = ? LIMIT 1");
+    $prodStmt->bind_param("s", $syncName);
+    $prodStmt->execute();
+    $prodRes = $prodStmt->get_result();
+    if ($prodRes && $prodRes->num_rows > 0) {
+        $prodId = $prodRes->fetch_assoc()['product_id'];
+        $prodStmt->close();
+        $s3 = $conn->prepare("SELECT stock_id FROM stock WHERE product_id = ? LIMIT 1");
+        $s3->bind_param("i", $prodId);
+        $s3->execute();
+        $sr3 = $s3->get_result();
+        if ($sr3 && $sr3->num_rows > 0) {
+            $sid3 = $sr3->fetch_assoc()['stock_id'];
+            $s3->close();
+            $u3 = $conn->prepare("UPDATE stock SET quantity = ?, last_updated = NOW() WHERE stock_id = ?");
+            $u3->bind_param("ii", $syncQty, $sid3);
+            $u3->execute();
+            $u3->close();
+        } else {
+            $s3->close();
+            $ins3 = $conn->prepare("INSERT INTO stock (product_id, quantity, last_updated) VALUES (?, ?, NOW())");
+            $ins3->bind_param("ii", $prodId, $syncQty);
+            $ins3->execute();
+            $ins3->close();
+        }
+    } else {
+        $prodStmt->close();
     }
 }
 
