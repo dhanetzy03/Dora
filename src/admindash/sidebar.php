@@ -67,10 +67,14 @@ body.collapsed .sidebar .sidebar-nav .nav-item span{
             <span>Stocks</span>
         </a>
         <a href="spoilage.php" class="nav-item <?= basename($_SERVER['PHP_SELF']) == 'spoilage.php' ? 'active' : '' ?>">
-            <i class='bx bx-bug'></i>
+            <i class='bx bx-trash'></i>
             <span>Spoilage</span>
         </a>
-        <a href="reports.php" class="nav-item <?= basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : '' ?>">
+        <a href="inventory_snapshots.php" class="nav-item <?= basename($_SERVER['PHP_SELF']) == 'inventory_snapshots.php' ? 'active' : '' ?>">
+            <i class='bx bx-photo-album'></i>
+            <span>Beg/End Inventory</span>
+        </a>
+        <a href="reports_new.php" class="nav-item <?= basename($_SERVER['PHP_SELF']) == 'reports_new.php' || basename($_SERVER['PHP_SELF']) == 'reports.php' ? 'active' : '' ?>">
             <i class='bx bx-file'></i>
             <span>Reports</span>
         </a>

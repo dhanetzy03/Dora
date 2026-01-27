@@ -198,6 +198,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
     $stock_qty = (int)($_POST['stock_qty'] ?? 0); 
     $cost_per_unit = (float)($_POST['cost_per_unit'] ?? 0.00); 
     $reorder_level = (int)($_POST['reorder_level'] ?? 1);
+    $shelf_life_days = !empty($_POST['shelf_life_days']) ? (int)$_POST['shelf_life_days'] : null;
+    $date_received = !empty($_POST['date_received']) ? $_POST['date_received'] : date('Y-m-d');
+    $expiry_date = null;
+    if ($shelf_life_days !== null && $date_received) {
+        $expiry_date = date('Y-m-d', strtotime($date_received . ' + ' . $shelf_life_days . ' days'));
+    }
 
     // Status based on quantity
     // NOTE: For editing, we must fetch the existing stock_qty since it's not in the edit form
@@ -225,18 +231,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
             // EDIT/UPDATE LOGIC
             // NOTE: stock_qty is not included in the UPDATE since it should be managed by the Movement Modal for logging integrity.
             if ($hasCost) {
-                $sql = "UPDATE inventory SET item_name = ?, category = ?, unit = ?, cost_per_unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
+                $sql = "UPDATE inventory SET item_name = ?, category = ?, unit = ?, cost_per_unit = ?, reorder_level = ?, status = ?, shelf_life_days = ?, date_received = ?, expiry_date = ?, last_updated = NOW() WHERE id = ?";
                 $stmt = $conn->prepare($sql);
                 if ($stmt) {
-                    $stmt->bind_param("sssidii", $item_name, $category, $unit, $cost_per_unit, $reorder_level, $status, $item_id);
+                    $stmt->bind_param("sssidiissi", $item_name, $category, $unit, $cost_per_unit, $reorder_level, $status, $shelf_life_days, $date_received, $expiry_date, $item_id);
                     $stmt->execute();
                     $stmt->close();
                 }
             } else {
-                $sql = "UPDATE inventory SET item_name = ?, category = ?, unit = ?, reorder_level = ?, status = ?, last_updated = NOW() WHERE id = ?";
+                $sql = "UPDATE inventory SET item_name = ?, category = ?, unit = ?, reorder_level = ?, status = ?, shelf_life_days = ?, date_received = ?, expiry_date = ?, last_updated = NOW() WHERE id = ?";
                 $stmt = $conn->prepare($sql);
                 if ($stmt) {
-                    $stmt->bind_param("sssiii", $item_name, $category, $unit, $reorder_level, $status, $item_id);
+                    $stmt->bind_param("sssiiissi", $item_name, $category, $unit, $reorder_level, $status, $shelf_life_days, $date_received, $expiry_date, $item_id);
                     $stmt->execute();
                     $stmt->close();
                 }
@@ -245,10 +251,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
         } else {
             // ADD LOGIC (Original)
             if ($hasCost) {
-                $sql = "INSERT INTO inventory (item_name, category, unit, stock_qty, cost_per_unit, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())";
+                $sql = "INSERT INTO inventory (item_name, category, unit, stock_qty, cost_per_unit, reorder_level, status, shelf_life_days, date_received, expiry_date, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
                 $stmt = $conn->prepare($sql);
                 if ($stmt) {
-                    $stmt->bind_param("sssidii", $item_name, $category, $unit, $stock_qty, $cost_per_unit, $reorder_level, $status);
+                    $stmt->bind_param("sssidiisss", $item_name, $category, $unit, $stock_qty, $cost_per_unit, $reorder_level, $status, $shelf_life_days, $date_received, $expiry_date);
                     if ($stmt->execute()) {
                         // SUCCESS LOGIC REMOVED
                     } else {
@@ -260,10 +266,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
                 }
             } else {
                 // Fallback when database does not have cost_per_unit
-                $sql = "INSERT INTO inventory (item_name, category, unit, stock_qty, reorder_level, status, last_updated) VALUES (?, ?, ?, ?, ?, ?, NOW())";
+                $sql = "INSERT INTO inventory (item_name, category, unit, stock_qty, reorder_level, status, shelf_life_days, date_received, expiry_date, last_updated) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
                 $stmt = $conn->prepare($sql);
                 if ($stmt) {
-                    $stmt->bind_param("sssiis", $item_name, $category, $unit, $stock_qty, $reorder_level, $status);
+                    $stmt->bind_param("sssiissss", $item_name, $category, $unit, $stock_qty, $reorder_level, $status, $shelf_life_days, $date_received, $expiry_date);
                     if ($stmt->execute()) {
                         // SUCCESS LOGIC REMOVED
                     } else {
@@ -851,6 +857,8 @@ data truncated for brevity (same CSS)
                         <th>Cost Per Unit</th> 
                         <th>Amount</th> 
                         <th>Reorder Level</th>
+                        <th>Shelf Life</th>
+                        <th>Expiry Date</th>
                         <th>Status</th>
                         <th>Last Updated</th>
                         <th>Actions</th>
@@ -863,6 +871,9 @@ data truncated for brevity (same CSS)
                         $cost_per_unit = $item['cost_per_unit'] ?? 0;
                         $reorder_level = $item['reorder_level'] ?? 0;
                         $item_id = $item['id']; // Get the item ID for the movement function
+                        $shelf_life_days = $item['shelf_life_days'] ?? null;
+                        $expiry_date = $item['expiry_date'] ?? null;
+                        $date_received = $item['date_received'] ?? null;
 
                         // Calculation for Amount
                         $amount = $stock_qty * $cost_per_unit;
@@ -870,12 +881,29 @@ data truncated for brevity (same CSS)
                         // Status determination based on Reorder Level (recalculating dynamically)
                         $status = 'Sufficient';
                         $class = 'badge-success';
-                        if ($stock_qty <= 0) {
-                            $status = 'Out of Stock';
-                            $class = 'badge-danger';
-                        } elseif ($stock_qty <= $reorder_level) {
-                            $status = 'Low Stock';
-                            $class = 'badge-warning';
+                        
+                        // Check expiry status first
+                        $expiry_status = '';
+                        if ($expiry_date) {
+                            $days_to_expiry = (strtotime($expiry_date) - time()) / (60 * 60 * 24);
+                            if ($days_to_expiry < 0) {
+                                $status = 'Expired';
+                                $class = 'badge-danger';
+                                $expiry_status = '⚠️ EXPIRED';
+                            } elseif ($days_to_expiry <= 3) {
+                                $expiry_status = '⚠️ Expires Soon';
+                            }
+                        }
+                        
+                        // Then check stock levels (if not expired)
+                        if ($status !== 'Expired') {
+                            if ($stock_qty <= 0) {
+                                $status = 'Out of Stock';
+                                $class = 'badge-danger';
+                            } elseif ($stock_qty <= $reorder_level) {
+                                $status = 'Low Stock';
+                                $class = 'badge-warning';
+                            }
                         }
 
                         // Re-order Level status (if stock is near/at reorder level)
@@ -892,6 +920,17 @@ data truncated for brevity (same CSS)
                         <td>₱<?= number_format($cost_per_unit, 2) ?></td>
                         <td>₱<?= number_format($amount, 2) ?></td>
                         <td><?= number_format($reorder_level) ?> <span class="badge badge-info"><?= $reorder_status ?></span></td>
+                        <td><?= $shelf_life_days ? $shelf_life_days . ' days' : 'N/A' ?></td>
+                        <td>
+                            <?php if ($expiry_date): ?>
+                                <?= date('M d, Y', strtotime($expiry_date)) ?>
+                                <?php if ($expiry_status): ?>
+                                    <br><small style="color:red;font-weight:bold;"><?= $expiry_status ?></small>
+                                <?php endif; ?>
+                            <?php else: ?>
+                                N/A
+                            <?php endif; ?>
+                        </td>
                         <td>
                             <span class="badge <?= $class ?>"><?= htmlspecialchars($status) ?></span>
                         </td>
@@ -905,7 +944,9 @@ data truncated for brevity (same CSS)
                                     '<?= htmlspecialchars($item['category']) ?>', 
                                     '<?= htmlspecialchars($item['unit']) ?>', 
                                     <?= $cost_per_unit ?>, 
-                                    <?= $reorder_level ?>
+                                    <?= $reorder_level ?>,
+                                    <?= $shelf_life_days ?? 'null' ?>,
+                                    '<?= htmlspecialchars($date_received ?? '') ?>'
                                 )">
                                 <i class='bx bx-edit'></i>
                             </button>
@@ -980,6 +1021,17 @@ data truncated for brevity (same CSS)
                 <div class="form-group">
                     <label>Reorder Level *</label>
                     <input type="number" name="reorder_level" required min="1">
+                </div>
+            </div>
+            <div class="form-row form-gap">
+                <div class="form-group">
+                    <label>Shelf Life (Days)</label>
+                    <input type="number" name="shelf_life_days" min="1" placeholder="e.g., 7, 30, 90">
+                    <small style="color:#666;">Optional: Enter days until item expires</small>
+                </div>
+                <div class="form-group">
+                    <label>Date Received</label>
+                    <input type="date" name="date_received" value="<?= date('Y-m-d') ?>">
                 </div>
             </div>
             <div class="modal-footer">
@@ -1079,6 +1131,16 @@ data truncated for brevity (same CSS)
                     <input type="number" name="reorder_level" id="editReorderLevel" required min="1">
                 </div>
             </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Shelf Life (Days)</label>
+                    <input type="number" name="shelf_life_days" id="editShelfLifeDays" min="1" placeholder="e.g., 7, 30, 90">
+                </div>
+                <div class="form-group">
+                    <label>Date Received</label>
+                    <input type="date" name="date_received" id="editDateReceived">
+                </div>
+            </div>
             <div class="modal-footer">
                 <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
                 <button type="submit" class="btn-primary">Save Changes</button>
@@ -1146,7 +1208,7 @@ function closeMovementModal() {
 }
 
 // NEW FUNCTIONS FOR EDIT MODAL
-function showEditModal(id, code, name, category, unit, cost, reorder) {
+function showEditModal(id, code, name, category, unit, cost, reorder, shelfLife, dateReceived) {
     document.getElementById('editItemId').value = id;
     document.getElementById('editItemNameDisplay').innerText = name;
     document.getElementById('editItemCode').value = code;
@@ -1155,6 +1217,8 @@ function showEditModal(id, code, name, category, unit, cost, reorder) {
     document.getElementById('editUnit').value = unit;
     document.getElementById('editCostPerUnit').value = cost.toFixed(2); // Format cost
     document.getElementById('editReorderLevel').value = reorder;
+    document.getElementById('editShelfLifeDays').value = shelfLife || '';
+    document.getElementById('editDateReceived').value = dateReceived || '';
     
     document.getElementById('editModal').style.display = 'flex';
 }
