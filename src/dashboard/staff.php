@@ -206,7 +206,7 @@ if ($price_col) {
         </div>
         <div class="top-bar-actions">
             <!-- <a href="../admindash/sales_validation.php" class="btn btn-primary">Sales Validation</a> -->
-            <a href="../auth/logout.php" class="btn-logout">Logout</a>
+            <a href="../auth/logout.php" class="btn-logout"></a>
         </div>
     </div>
 
@@ -546,10 +546,13 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
     </div>
     
+    <!-- Modal Overlay -->
+    <div id="modalOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.5); z-index: 2000;" onclick="closeDetailsModal()"></div>
+    
     <div id="detailsModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeDetailsModal()">&times;</span>
-            <h2 id="modalTitle">Transaction Details</h2>
+        <div style="position: relative;">
+            <span class="close" onclick="closeDetailsModal()" style="position: absolute; top: -10px; right: -10px; cursor: pointer; font-size: 28px; color: #999;">&times;</span>
+            <h2 id="modalTitle" style="margin-top: 0; margin-bottom: 20px;">Transaction Details</h2>
             <input type="hidden" id="currentSaleId">
 
             <div class="table-responsive table-margin-top">
@@ -590,11 +593,14 @@ document.addEventListener('DOMContentLoaded', function () {
     <script>
     function closeDetailsModal() {
         const m = document.getElementById('detailsModal');
+        const overlay = document.getElementById('modalOverlay');
         if (m) m.style.display = 'none';
+        if (overlay) overlay.style.display = 'none';
     }
 
     function showDetailsModal(saleId, saleNumber, saleDate) {
         const modal = document.getElementById('detailsModal');
+        const overlay = document.getElementById('modalOverlay');
         const title = document.getElementById('modalTitle');
         const tableBody = document.getElementById('transactionBody');
         document.getElementById('currentSaleId').value = saleId;
@@ -604,6 +610,7 @@ document.addEventListener('DOMContentLoaded', function () {
         title.innerText = `Transaction Details for Sale #${saleNumber}`;
         tableBody.innerHTML = '<tr><td colspan="7" class="empty-message">Loading transaction items...</td></tr>';
         if (modal) modal.style.display = 'block';
+        if (overlay) overlay.style.display = 'block';
 
         fetch('../admindash/sales_validation.php?action=fetch_sale_items&sale_id=' + encodeURIComponent(saleId))
             .then(response => {
@@ -697,7 +704,13 @@ document.addEventListener('DOMContentLoaded', function () {
         formData.append('markup_rate', newMarkupRate);
 
         fetch('../admindash/sales_validation.php', { method: 'POST', body: formData })
-        .then(response => response.json())
+        .then(response => {
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                return response.text().then(text => { throw new Error('Expected JSON but got: ' + text.substring(0, 200)); });
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.success) {
                 const row = inputElement.closest('tr');
@@ -708,9 +721,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 inputElement.style.backgroundColor = '#e8f5e9';
                 setTimeout(() => inputElement.style.backgroundColor = 'transparent', 1500);
             } else {
-                alert('Failed to update markup: ' + data.message);
+                alert('Failed to update markup: ' + (data.message || 'Unknown error'));
             }
-        }).catch(error => { console.error('Error updating markup:', error); alert('A network error occurred while updating the markup.'); });
+        }).catch(error => { console.error('Error updating markup:', error); alert('Error: ' + error.message); });
     }
 
     function populateAdminProductSelect() {
@@ -741,4 +754,18 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function saleInfoGlobalNumber(saleId){ try{ return document.getElementById('modalTitle').innerText.replace('Transaction Details for Sale #','').trim(); }catch(e){return null;} }
+    
+    // Add click handlers for review buttons
+    document.addEventListener('DOMContentLoaded', function() {
+        const reviewButtons = document.querySelectorAll('.btn-review-sale');
+        reviewButtons.forEach(btn => {
+            btn.addEventListener('click', function() {
+                const saleId = this.getAttribute('data-sale-id');
+                const row = this.closest('tr');
+                const saleNumber = row.querySelector('td:nth-child(1)').innerText;
+                const saleDate = row.querySelector('td:nth-child(2)').innerText;
+                showDetailsModal(saleId, saleNumber, saleDate);
+            });
+        });
+    });
     </script>

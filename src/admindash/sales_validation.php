@@ -74,14 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_markup'])) {
     $new_markup_rate = (float)$_POST['markup_rate']; // Passed as a decimal (e.g., 0.20)
     
     // 1. Fetch item cost and quantity
-    $stmt_fetch = $conn->prepare("SELECT quantity, unit_cost_at_sale FROM sale_items WHERE sale_item_id = ?");
+    // Try to get unit_cost_at_sale first (if it exists), fallback to unit_price
+    $stmt_fetch = $conn->prepare("SELECT quantity, unit_price FROM sale_items WHERE sale_item_id = ?");
     $stmt_fetch->bind_param("i", $sale_item_id);
     $stmt_fetch->execute();
     $item_data = $stmt_fetch->get_result()->fetch_assoc();
     $stmt_fetch->close();
     
     if ($item_data) {
-        $unit_cost = (float)$item_data['unit_cost_at_sale'];
+        $unit_cost = (float)$item_data['unit_price'];  // Using unit_price as the cost
         $quantity = (float)$item_data['quantity'];
         
         // Calculation: SELLING PRICE = UNIT COST * (1 + MARKUP RATE)
@@ -90,14 +91,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_markup'])) {
         // Calculation: TOTAL SALES = SELLING PRICE * QUANTITY
         $new_subtotal = $new_unit_price * $quantity;
         
-        // 2. Update the sale_items row
+        // 2. Update the sale_items row (only update available columns)
         $stmt_update = $conn->prepare("
             UPDATE sale_items 
-            SET markup_rate = ?, unit_price = ?, subtotal = ? 
+            SET unit_price = ?, subtotal = ? 
             WHERE sale_item_id = ?
         ");
-        $stmt_update->bind_param("dddi", $new_markup_rate, $new_unit_price, $new_subtotal, $sale_item_id);
-        $stmt_update->execute();
+        $stmt_update->bind_param("ddi", $new_unit_price, $new_subtotal, $sale_item_id);
+        if (!$stmt_update->execute()) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Database error: ' . $stmt_update->error]);
+            $stmt_update->close();
+            exit();
+        }
         $stmt_update->close();
         
         header('Content-Type: application/json');
@@ -110,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_markup'])) {
     }
     
     header('Content-Type: application/json');
-    echo json_encode(['success' => false, 'message' => 'Item not found or calculation failed.']);
+    echo json_encode(['success' => false, 'message' => 'Item not found.']);
     exit();
 }
 // --- END: MARKUP UPDATE ENDPOINT ---

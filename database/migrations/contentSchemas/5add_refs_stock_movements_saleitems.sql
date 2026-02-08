@@ -1,4 +1,4 @@
-
+ALTER TABLE `stock_movements`
   ADD COLUMN `sale_ref_id` INT(11) DEFAULT NULL AFTER `reference_id`,
   ADD COLUMN `purchase_ref_id` INT(11) DEFAULT NULL AFTER `sale_ref_id`;
 

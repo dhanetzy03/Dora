@@ -11,7 +11,7 @@ UPDATE inventory i
 JOIN categories c ON LOWER(i.category) = LOWER(c.category_name)
 SET i.category_id = c.category_id;
 
-FK constraints
+-- FK constraints
 ALTER TABLE `raw_materials` ADD CONSTRAINT `fk_rawmaterials_category` FOREIGN KEY (`category_id`) REFERENCES `categories`(`category_id`) ON DELETE SET NULL;
 ALTER TABLE `inventory` ADD CONSTRAINT `fk_inventory_category` FOREIGN KEY (`category_id`) REFERENCES `categories`(`category_id`) ON DELETE SET NULL;
 

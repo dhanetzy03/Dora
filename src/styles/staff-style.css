@@ -728,10 +728,23 @@ html.sidebar-will-collapse .main {
     background: white;
     padding: 30px;
     border-radius: 12px;
-    max-width: 500px;
+    max-width: 900px;
     width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
     animation: slideUp 0.3s ease;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2001;
+    display: none;
+}
+
+.modal[style*="display: block"],
+.modal.show {
+    display: block !important;
 }
 
 .modal-header {
