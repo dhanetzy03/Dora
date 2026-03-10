@@ -1,40 +1,3 @@
-<style>
-/* Sidebar layout and page shifting when toggled */
-.sidebar{
-    position:fixed;
-    top:0;
-    left:0;
-    height:100vh;
-    width:260px;
-    background:#2f3a46;
-    overflow:auto;
-    transition:width .18s ease, transform .18s ease;
-    z-index:1000;
-}
-
-body.collapsed .sidebar{ width:70px; }
-
-.main-content{
-    margin-left:260px !important;
-    transition:margin-left .18s ease;
-    padding:20px;
-}
-body.collapsed .main-content{ margin-left:70px !important; }
-
-/* Hide text labels when collapsed */
-body.collapsed .sidebar .brand-text p,
-body.collapsed .sidebar .sidebar-nav .nav-item span{
-    display:none;
-}
-
-/* Mobile: sidebar overlays content */
-@media (max-width:800px){
-    .sidebar{ transform:translateX(-100%); }
-    body.show-sidebar .sidebar{ transform:translateX(0); }
-    .main-content{ margin-left:0 !important; }
-}
-</style>
-
 <div class="sidebar">
     <div class="sidebar-header">
         <div class="sidebar-brand">
@@ -79,6 +42,12 @@ body.collapsed .sidebar .sidebar-nav .nav-item span{
             <span>Reports</span>
         </a>
     </nav>
+    <div class="sidebar-footer-logout">
+        <a href="../auth/logout.php" class="nav-item nav-item-logout">
+            <i class='bx bx-log-out'></i>
+            <span>Logout</span>
+        </a>
+    </div>
 </div>
 <script>
 ;(function(){

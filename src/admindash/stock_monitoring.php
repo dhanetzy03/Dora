@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../auth/login.php");
@@ -70,64 +70,16 @@ $inventory_list = $conn->query("SELECT * FROM inventory ORDER BY item_name ASC")
 <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
 <title>Stock Monitoring - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<!-- Inline full admin CSS to prevent FOUC on first load -->
-<style>
-body.shukran-admin * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-body.shukran-admin {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
-    display: flex;
-    min-height: 100vh;
-}
-
-/* Sidebar Styles */
-.sidebar {
-    width: 260px;
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-    color: white;
-    padding: 0;
-    position: fixed;
-    height: 100vh;
-    overflow-y: auto;
-    z-index: 1002;
-    transition: transform 0.25s ease, width 0.25s ease;
-}
-
-...css truncated for brevity...
-</style>
-<!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
 <link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
-<style>
-/* Ensure modals center correctly when shown (left as display:none by default).
-   JS will set display:flex when opening so align-items/justify-content apply. */
-.modal {
-    align-items: center;
-    justify-content: center;
-    z-index: 3000;
-}
-.modal .modal-content {
-    max-width: 900px;
-    width: 100%;
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    max-height: 90vh;
-    overflow: auto;
-}
-</style>
+<link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
 <script>
 // Apply sidebar state BEFORE body renders to prevent layout shift
 // DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
 (function(){
     var storedState = localStorage.getItem('sidebarCollapsed');
-    // Only collapse if explicitly set to 'true' in localStorage
     if (storedState === 'true') {
         document.documentElement.classList.add('sidebar-will-collapse');
     }
-    // Otherwise default is expanded (no class needed)
 })();
 </script>
 </head>
@@ -138,10 +90,6 @@ body.shukran-admin {
 <div class="main-content">
     <div class="top-bar">
         <h1>Stock Monitoring</h1>
-        <div class="user-info">
-            <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span>
-            <a href="../auth/logout.php" class="btn-logout">Logout</a>
-        </div>
     </div>
 
     <div class="stats-grid">
@@ -186,10 +134,10 @@ body.shukran-admin {
     <div class="content-card">
         <div class="card-header">
             <h2>Full Stocks Monitoring</h2>
-            <div style="display:flex; gap:12px; align-items:center;">
-                <div style="font-weight:700; color:#333;">Total Inventory Cost: <span style="color:#2d3748;">₱<?= number_format($total_inventory_cost, 2) ?></span>
+            <div class="display-flex gap-12 align-items-center">
+                <div class="cost-display">Total Inventory Cost: <span class="cost-amount">₱<?= number_format($total_inventory_cost, 2) ?></span>
                     <?php if (!$costColumnExists): ?>
-                        <div class="muted-text" style="margin-left:12px; color:#a00; font-weight:600; font-size:12px;">Cost data missing — add `cost_per_unit` column to `inventory` to enable totals.</div>
+                        <div class="muted-text cost-missing-text">Cost data missing — add `cost_per_unit` column to `inventory` to enable totals.</div>
                     <?php endif; ?>
                 </div>
                 <button class="btn-primary" onclick="refreshInventory()"><i class='bx bx-refresh'></i> Refresh</button>
@@ -216,7 +164,7 @@ body.shukran-admin {
                     <?php foreach ($inventory_list as $it): ?>
                     <?php $amount = ($it['stock_qty'] ?? 0) * (float)($it['cost_per_unit'] ?? 0); ?>
                     <tr>
-                        <td><a href="#" onclick="viewTransactions(<?= (int)$it['id'] ?>);return false;" style="font-weight:700;"><?= htmlspecialchars($it['item_code'] ?? '—') ?></a></td>
+                        <td><a href="#" onclick="viewTransactions(<?= (int)$it['id'] ?>);return false;" class="item-code-link"><?= htmlspecialchars($it['item_code'] ?? '—') ?></a></td>
                         <td><?= htmlspecialchars($it['item_name']) ?></td>
                         <td><?= htmlspecialchars($it['category']) ?></td>
                         <td><?= htmlspecialchars($it['unit'] ?? 'pcs') ?></td>
@@ -290,7 +238,7 @@ body.shukran-admin {
             <h2 id="txnModalTitle">Transactions</h2>
             <span class="close" onclick="closeModal('transactionsModal')">&times;</span>
         </div>
-        <div style="padding:20px;">
+        <div class="modal-body">
             <table class="data-table" id="transactionTable">
                 <thead>
                     <tr><th>Date</th><th>Ref #</th><th>Particulars</th><th>In</th><th>Out</th><th>Balance</th><th>Unit Cost</th><th>Amount</th></tr>
@@ -308,7 +256,7 @@ body.shukran-admin {
             <h2 id="movModalTitle">Add Stock Movement</h2>
             <span class="close" onclick="closeModal('movementModal')">&times;</span>
         </div>
-        <div style="padding:20px;">
+        <div class="modal-body">
             <form method="POST" action="inventory.php">
                 <input type="hidden" name="product_id" id="mov_product_id">
                 <div class="form-group">
@@ -330,7 +278,7 @@ body.shukran-admin {
                     <label>Remarks</label>
                     <textarea name="remarks" rows="3" placeholder="Optional remarks"></textarea>
                 </div>
-                <div style="text-align:right;">
+                <div class="modal-actions">
                     <button type="button" class="btn-secondary" onclick="closeModal('movementModal')">Cancel</button>
                     <button type="submit" class="btn-primary">Submit</button>
                 </div>
@@ -358,7 +306,7 @@ function viewTransactions(itemId){
         body.innerHTML = '';
         data.transactions.forEach(t => {
             var tr = document.createElement('tr');
-            tr.innerHTML = '<td>'+t.date+'</td><td>'+t.ref_num+'</td><td>'+t.particulars+'</td><td style="text-align:right">'+(t.in||'')+'</td><td style="text-align:right">'+(t.out||'')+'</td><td style="text-align:right">'+t.balance+'</td><td style="text-align:right">'+t.unit_cost+'</td><td style="text-align:right">'+t.amount+'</td>';
+            tr.innerHTML = '<td>'+t.date+'</td><td>'+t.ref_num+'</td><td>'+t.particulars+'</td><td class="text-align-right">'+(t.in||'')+'</td><td class="text-align-right">'+(t.out||'')+'</td><td class="text-align-right">'+t.balance+'</td><td class="text-align-right">'+t.unit_cost+'</td><td class="text-align-right">'+t.amount+'</td>';
             body.appendChild(tr);
         });
         openModal('transactionsModal');

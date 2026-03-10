@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../auth/login.php");
@@ -65,35 +65,7 @@ $total_transactions = count($sales_reports);
     <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
     <title>Sales Reports - Shukran Café</title>
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-    <!-- Inline full admin CSS to prevent FOUC on first load -->
-    <style>
-body.shukran-admin * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-body.shukran-admin {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
-    display: flex;
-    min-height: 100vh;
-}
 
-/* Sidebar Styles */
-.sidebar {
-    width: 260px;
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-    color: white;
-    padding: 0;
-    position: fixed;
-    height: 100vh;
-    overflow-y: auto;
-    z-index: 1002;
-    transition: transform 0.25s ease, width 0.25s ease;
-}
-
-...css truncated for brevity...
-</style>
 <script>
 // Apply sidebar state BEFORE body renders to prevent layout shift
 // DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
@@ -106,139 +78,9 @@ body.shukran-admin {
     // Otherwise default is expanded (no class needed)
 })();
 </script>
-    <style>
-    /* Additional Report Styles */
-    .report-filter {
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 15px;
-        align-items: flex-end;
-    }
 
-    .report-filter .form-group {
-        margin-bottom: 0;
-    }
-
-    .report-filter label {
-        display: block;
-        margin-bottom: 8px;
-        color: #333;
-        font-weight: 500;
-        font-size: 14px;
-    }
-
-    .report-filter input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-size: 14px;
-    }
-
-    .report-filter button {
-        padding: 10px 20px;
-        background: #4a5568;
-        color: white;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-weight: 500;
-        transition: background 0.3s;
-    }
-
-    .report-filter button:hover {
-        background: #2d3748;
-    }
-
-    .summary-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 15px;
-        margin-bottom: 25px;
-    }
-
-    .summary-card {
-        background: white;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
-        border-top: 4px solid #4a5568;
-    }
-
-    .summary-card h4 {
-        color: #666;
-        font-size: 12px;
-        margin-bottom: 10px;
-        text-transform: uppercase;
-    }
-
-    .summary-card .value {
-        font-size: 24px;
-        font-weight: bold;
-        color: #333;
-    }
-
-    .payment-breakdown, .discount-breakdown {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
-        margin-bottom: 25px;
-    }
-
-    .breakdown-card {
-        background: white;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .breakdown-card h4 {
-        color: #333;
-        font-size: 14px;
-        margin-bottom: 12px;
-    }
-
-    .breakdown-item {
-        display: flex;
-        justify-content: space-between;
-        padding: 8px 0;
-        border-bottom: 1px solid #eee;
-    }
-
-    .breakdown-item:last-child {
-        border-bottom: none;
-    }
-
-    .breakdown-label {
-        color: #666;
-    }
-
-    .breakdown-value {
-        font-weight: 600;
-        color: #333;
-    }
-
-    @media (max-width: 768px) {
-        .report-filter {
-            grid-template-columns: 1fr;
-        }
-
-        .summary-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        .payment-breakdown, .discount-breakdown {
-            grid-template-columns: 1fr;
-        }
-    }
-    </style>
     <link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+    <link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
 </head>
 <body class="shukran-admin">
 
@@ -247,17 +89,13 @@ body.shukran-admin {
 <div class="main-content">
     <div class="top-bar">
         <h1>Sales Reports</h1>
-        <div class="user-info">
-            <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span>
-            <a href="../auth/logout.php" class="btn-logout">Logout</a>
-        </div>
     </div>
 
     <!-- Date Filter -->
     <div class="report-filter">
         <div class="form-group">
             <label>From Date</label>
-            <form method="POST" id="filterForm" style="display: none;"></form>
+            <form method="POST" id="filterForm" class="display-none"></form>
             <input type="date" id="fromDate" value="<?= $from_date ?>" form="filterForm" name="from_date">
         </div>
         <div class="form-group">
@@ -313,7 +151,7 @@ body.shukran-admin {
     <div class="content-card">
         <div class="card-header">
             <h2>📋 Detailed Sales Report (<?= $total_transactions ?> Records)</h2>
-            <a href="#" onclick="printReport()" style="color: #4a5568; text-decoration: none; font-size: 14px;">
+            <a href="#" onclick="printReport()" class="link-gray">
                 🖨️ Print Report →
             </a>
         </div>

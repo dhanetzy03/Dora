@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../auth/login.php");
@@ -203,9 +203,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Raw materials add/edit (preserve original table behavior)
         $material_id = (int)($_POST['material_id'] ?? 0);
         $material_name = trim($_POST['material_name'] ?? '');
-        $unit = trim($_POST['unit'] ?? 'pcs');
+        $unit = trim($_POST['unit_m'] ?? $_POST['unit'] ?? 'pcs');
         $quantity = (int)($_POST['quantity'] ?? 0);
-        $reorder_level = (int)($_POST['reorder_level'] ?? 0);
+        $reorder_level = (int)($_POST['reorder_level_m'] ?? $_POST['reorder_level'] ?? 0);
         $supplier = trim($_POST['supplier'] ?? '');
 
         if (empty($material_name) || empty($unit)) {
@@ -214,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($material_id > 0) {
                 $stmt = $conn->prepare("UPDATE raw_materials SET material_name = ?, unit = ?, quantity = ?, reorder_level = ?, supplier = ?, last_updated = NOW() WHERE material_id = ?");
                 if ($stmt) {
-                    $stmt->bind_param("ssii si", $material_name, $unit, $quantity, $reorder_level, $supplier, $material_id);
+                    $stmt->bind_param("ssiisi", $material_name, $unit, $quantity, $reorder_level, $supplier, $material_id);
                     $stmt->execute();
                     $stmt->close();
                 }
@@ -251,50 +251,9 @@ if ($invRes) $inventory_list = $invRes->fetch_all(MYSQLI_ASSOC);
     <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
     <title>Products - Admin</title>
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-    <!-- Inline full admin CSS to prevent FOUC on first load -->
-    <style>
-body.shukran-admin * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-body.shukran-admin {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
-    display: flex;
-    min-height: 100vh;
-}
 
-/* Sidebar Styles */
-.sidebar {
-    width: 260px;
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-    color: white;
-    padding: 0;
-    position: fixed;
-    height: 100vh;
-    overflow-y: auto;
-    z-index: 1002;
-    transition: transform 0.25s ease, width 0.25s ease;
-}
-
-/* Sidebar header / toggle */
-.sidebar-header {
-    padding: 18px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-
-/* Sidebar header / toggle */
-.sidebar-header {
-    padding: 30px 20px;
-    text-align: center;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-sidebar CSS truncated for brevity (same as above)
-</style>
-    <!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
     <link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+    <link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
 <script>
 // Apply sidebar state BEFORE body renders to prevent layout shift
 // DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
@@ -313,104 +272,148 @@ sidebar CSS truncated for brevity (same as above)
 <?php include 'sidebar.php'; ?>
 
 <div class="main">
-    <div class="page-container">
-    <h1>Products Management</h1>
+    <div class="dashboard-header">
+        <div class="dashboard-header-content">
+            <h1><i class='bx bx-package'></i> Products Management</h1>
+            <p class="dashboard-subtitle">Manage products and raw materials inventory</p>
+        </div>
+    </div>
 
     <?php if (!empty($_SESSION['success'])): ?>
-        <div class="success"><?= htmlspecialchars($_SESSION['success']) ?></div>
+        <div class="alert-success"><?= htmlspecialchars($_SESSION['success']) ?></div>
         <?php unset($_SESSION['success']); ?>
     <?php endif; ?>
     <?php if (!empty($_SESSION['error'])): ?>
-        <div class="error"><?= htmlspecialchars($_SESSION['error']) ?></div>
+        <div class="alert-error"><?= htmlspecialchars($_SESSION['error']) ?></div>
         <?php unset($_SESSION['error']); ?>
     <?php endif; ?>
     <?php if ($error): ?>
-        <div class="error"><?= htmlspecialchars($error) ?></div>
+        <div class="alert-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
+    <div class="page-container">
+
     <div class="tabs">
-        <button type="button" id="tabProducts" class="tab-btn active">Products</button>
-        <button type="button" id="tabMaterials" class="tab-btn">Raw Materials</button>
+        <button type="button" id="tabProducts" class="tab-btn active"><i class='bx bx-cube'></i> Products</button>
+        <button type="button" id="tabMaterials" class="tab-btn"><i class='bx bx-leaf'></i> Raw Materials</button>
     </div>
 
     <div id="productsSection">
+    <div class="content-card" style="margin-top:18px;">
+        <div class="card-header">
+            <h2><i class='bx bx-cube'></i> Product Details</h2>
+        </div>
+        <div class="content-body">
     <form method="POST" action="raw_materials.php">
         <input type="hidden" name="entity" value="product">
         <div class="form-grid">
             <input type="hidden" name="product_id" id="product_id">
-            <label for="product_code">Product Code</label>
-            <input class="full" type="text" name="product_code" id="product_code" placeholder="Product Code (optional)">
+            <div class="form-group full">
+                <label for="product_code">Product Code</label>
+                <input type="text" name="product_code" id="product_code" placeholder="Product Code (optional)">
+            </div>
+            <div class="form-group full">
+                <label for="product_name">Product Name</label>
+                <input type="text" name="product_name" id="product_name" placeholder="Product Name" required>
+            </div>
+            <div class="form-group full">
+                <label for="category_id">Category</label>
+                <select name="category_id" id="category_id">
+                    <option value="">-- Select Category --</option>
+                    <?php foreach ($categories as $c): ?>
+                        <option value="<?= $c['category_id'] ?>"><?= htmlspecialchars($c['category_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="unit">Unit</label>
+                <input type="text" name="unit" id="unit" placeholder="Unit (e.g., pcs, cup)" required>
+            </div>
+            <div class="form-group">
+                <label for="price">Unit Price</label>
+                <input type="number" step="0.01" name="price" id="price" placeholder="Price" value="0.00">
+            </div>
 
-            <label for="product_name">Product Name</label>
-            <input class="full" type="text" name="product_name" id="product_name" placeholder="Product Name" required>
-
-            <label for="category_id">Category</label>
-            <select name="category_id" id="category_id" class="full">
-                <option value="">-- Select Category --</option>
-                <?php foreach ($categories as $c): ?>
-                    <option value="<?= $c['category_id'] ?>"><?= htmlspecialchars($c['category_name']) ?></option>
-                <?php endforeach; ?>
-            </select>
-
-            <label for="unit">Unit</label>
-            <input type="text" name="unit" id="unit" placeholder="Unit (e.g., pcs, cup)" required>
-
-            <label for="price">Unit Price</label>
-            <input type="number" step="0.01" name="price" id="price" placeholder="Price" value="0.00">
-
-            <label for="initial_stock">Initial Stock</label>
-            <input type="number" step="0.01" name="initial_stock" id="initial_stock" placeholder="Initial Stock" value="0">
-
-            <label for="add_to_inventory">Add To (existing inventory)</label>
-            <select name="add_to_inventory_id" id="add_to_inventory">
-                <option value="">-- Select inventory item to add stock to --</option>
-                <?php foreach ($inventory_list as $inv): ?>
-                    <option value="<?= $inv['id'] ?>"><?= htmlspecialchars($inv['item_name']) ?> (Current: <?= number_format($inv['stock_qty'] ?? 0,2) ?>)</option>
-                <?php endforeach; ?>
-            </select>
-
-            <label for="add_quantity">Add Quantity (when using Add To)</label>
-            <input type="number" step="0.01" name="add_quantity" id="add_quantity" placeholder="Quantity to add to selected inventory item" value="0">
-
-            <label for="reorder_level">Reorder Level</label>
-            <input type="number" name="reorder_level" id="reorder_level" placeholder="Reorder Level" value="0">
-
-            <label for="description">Description</label>
-            <textarea name="description" id="description" placeholder="Description (optional)" class="full" rows="2"></textarea>
+            <div class="form-group">
+                <label for="initial_stock">Initial Stock</label>
+                <input type="number" step="0.01" name="initial_stock" id="initial_stock" placeholder="Initial Stock" value="0">
+            </div>
+            <div class="form-group full">
+                <label for="add_to_inventory">Add To (existing inventory)</label>
+                <select name="add_to_inventory_id" id="add_to_inventory">
+                    <option value="">-- Select inventory item to add stock to --</option>
+                    <?php foreach ($inventory_list as $inv): ?>
+                        <option value="<?= $inv['id'] ?>"><?= htmlspecialchars($inv['item_name']) ?> (Current: <?= number_format($inv['stock_qty'] ?? 0,2) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div><!-- /add_to_inventory form-group -->
+            <div class="form-group">
+                <label for="add_quantity">Add Quantity (when using Add To)</label>
+                <input type="number" step="0.01" name="add_quantity" id="add_quantity" placeholder="Quantity to add" value="0">
+            </div>
+            <div class="form-group">
+                <label for="reorder_level">Reorder Level</label>
+                <input type="number" name="reorder_level" id="reorder_level" placeholder="Reorder Level" value="0">
+            </div>
+            <div class="form-group full">
+                <label for="description">Description</label>
+                <textarea name="description" id="description" placeholder="Description (optional)" rows="2"></textarea>
+            </div>
             <div class="form-actions">
-                <button class="btn btn-primary" type="submit">Save Product</button>
-                <button class="btn btn-secondary" type="button" onclick="resetForm()">Reset</button>
+                <button class="btn btn-primary" type="submit"><i class='bx bx-save'></i> Save Product</button>
+                <button class="btn btn-secondary" type="button" onclick="resetForm()"><i class='bx bx-reset'></i> Reset</button>
             </div>
         </div>
     </form>
-    </div>
+    </div><!-- content-body -->
+    </div><!-- content-card -->
+    </div><!-- productsSection -->
 
-    <div id="materialsSection" style="display:none;">
+    <div id="materialsSection" class="display-none">
+    <div class="content-card" style="margin-top:18px;">
+        <div class="card-header">
+            <h2><i class='bx bx-leaf'></i> Raw Material Details</h2>
+        </div>
+        <div class="content-body">
     <form method="POST" action="raw_materials.php">
         <input type="hidden" name="entity" value="material">
         <input type="hidden" name="material_id" id="material_id">
-        <label for="material_name">Material Name</label>
-        <input class="full" type="text" name="material_name" id="material_name" placeholder="Material Name" required>
-
-        <label for="unit_m">Unit</label>
-        <input type="text" name="unit_m" id="unit_m" placeholder="Unit (e.g., kg, pcs)" required>
-
-        <label for="quantity">Quantity</label>
-        <input type="number" name="quantity" id="quantity" placeholder="Quantity" value="0">
-
-        <label for="reorder_level_m">Reorder Level</label>
-        <input type="number" name="reorder_level_m" id="reorder_level_m" placeholder="Reorder Level" value="0">
-
-        <label for="supplier">Supplier</label>
-        <input class="full" type="text" name="supplier" id="supplier" placeholder="Supplier (optional)">
+        <div class="form-grid">
+        <div class="form-group full">
+            <label for="material_name">Material Name</label>
+            <input class="full" type="text" name="material_name" id="material_name" placeholder="Material Name" required>
+        </div>
+        <div class="form-group">
+            <label for="unit_m">Unit</label>
+            <input type="text" name="unit_m" id="unit_m" placeholder="Unit (e.g., kg, pcs)" required>
+        </div>
+        <div class="form-group">
+            <label for="quantity">Quantity</label>
+            <input type="number" name="quantity" id="quantity" placeholder="Quantity" value="0">
+        </div>
+        <div class="form-group">
+            <label for="reorder_level_m">Reorder Level</label>
+            <input type="number" name="reorder_level_m" id="reorder_level_m" placeholder="Reorder Level" value="0">
+        </div>
+        <div class="form-group full">
+            <label for="supplier">Supplier</label>
+            <input class="full" type="text" name="supplier" id="supplier" placeholder="Supplier (optional)">
+        </div>
         <div class="form-actions">
-            <button class="btn btn-primary" type="submit">Save Material</button>
-            <button class="btn btn-secondary" type="button" onclick="resetMaterialForm()">Reset</button>
+            <button class="btn btn-primary" type="submit"><i class='bx bx-save'></i> Save Material</button>
+            <button class="btn btn-secondary" type="button" onclick="resetMaterialForm()"><i class='bx bx-reset'></i> Reset</button>
+        </div>
         </div>
     </form>
-    </div>
+    </div><!-- content-body -->
+    </div><!-- content-card -->
+    </div><!-- materialsSection -->
 
-    <div class="table-wrapper">
+    <div class="content-card" style="margin-top:18px;">
+        <div class="card-header">
+            <h2><i class='bx bx-table'></i> Products List</h2>
+        </div>
+    <div class="table-responsive">
     <table class="materials-table">
         <tr>
             <th>Code</th>
@@ -446,10 +449,14 @@ sidebar CSS truncated for brevity (same as above)
             </tr>
         <?php endforeach; endif; ?>
     </table>
-    </div>
-    
-    <h2>Raw Materials</h2>
-    <div class="table-wrapper">
+    </div><!-- table-responsive -->
+    </div><!-- content-card -->
+
+    <div class="content-card" style="margin-top:18px;">
+        <div class="card-header">
+            <h2><i class='bx bx-leaf'></i> Raw Materials List</h2>
+        </div>
+    <div class="table-responsive">
     <table class="materials-table">
         <tr>
             <th>Name</th>
@@ -484,9 +491,11 @@ sidebar CSS truncated for brevity (same as above)
             </tr>
         <?php endforeach; endif; ?>
     </table>
-    </div>
+    </div><!-- table-responsive -->
+    </div><!-- content-card (raw materials) -->
 
-</div>
+    </div><!-- page-container -->
+</div><!-- main -->
 
 <script>
 function edit(p) {

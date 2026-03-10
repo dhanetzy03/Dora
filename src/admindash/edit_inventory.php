@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../auth/login.php");
@@ -74,38 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Edit Item</title>
-    <!-- Inline full admin CSS to prevent FOUC on first load -->
-    <style>
-body.shukran-admin * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-body.shukran-admin {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
-    display: flex;
-    min-height: 100vh;
-}
 
-/* Sidebar Styles */
-.sidebar {
-    width: 260px;
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-    color: white;
-    padding: 0;
-    position: fixed;
-    height: 100vh;
-    overflow-y: auto;
-    z-index: 1002;
-    transition: transform 0.25s ease, width 0.25s ease;
-}
-
-...css truncated for brevity...
-</style>
-    <!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
     <link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
-    <style>body{font-family:Segoe UI,Arial;background:#f6f7fb;padding:24px} .card{max-width:760px;margin:0 auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.06)} label{display:block;margin-top:10px;font-weight:600} input,select{width:100%;padding:8px;margin-top:6px;border:1px solid #ddd;border-radius:6px}</style>
+    <link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
+
 </head>
 <body class="shukran-admin">
 <?php include 'sidebar.php'; ?>
@@ -123,7 +95,7 @@ body.shukran-admin {
             <input type="number" name="stock_qty" required value="<?= htmlspecialchars($item['stock_qty']) ?>">
             <label>Reorder Level (leave empty to keep existing)</label>
             <input type="number" name="reorder_level" placeholder="Current: <?= htmlspecialchars($item['reorder_level']) ?>">
-            <div style="margin-top:14px">
+            <div class="margin-top-14">
                 <a href="inventory.php" class="btn-secondary">Cancel</a>
                 <button type="submit" class="btn-primary">Save Changes</button>
             </div>

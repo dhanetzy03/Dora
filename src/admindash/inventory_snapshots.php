@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../auth/login.php");
@@ -91,14 +91,32 @@ if (!$selected_date && !empty($snapshot_dates)) {
 $beginning_inventory = [];
 $ending_inventory = [];
 if ($selected_date) {
-    $beginning_inventory = $conn->query("SELECT * FROM inventory_snapshots WHERE snapshot_date = '$selected_date' AND snapshot_type = 'beginning' ORDER BY item_name")->fetch_all(MYSQLI_ASSOC);
-    $ending_inventory = $conn->query("SELECT * FROM inventory_snapshots WHERE snapshot_date = '$selected_date' AND snapshot_type = 'ending' ORDER BY item_name")->fetch_all(MYSQLI_ASSOC);
+    $stmt_b = $conn->prepare("SELECT * FROM inventory_snapshots WHERE snapshot_date = ? AND snapshot_type = 'beginning' ORDER BY item_name");
+    $stmt_b->bind_param('s', $selected_date);
+    $stmt_b->execute();
+    $beginning_inventory = $stmt_b->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt_b->close();
+    
+    $stmt_e = $conn->prepare("SELECT * FROM inventory_snapshots WHERE snapshot_date = ? AND snapshot_type = 'ending' ORDER BY item_name");
+    $stmt_e->bind_param('s', $selected_date);
+    $stmt_e->execute();
+    $ending_inventory = $stmt_e->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt_e->close();
 }
 
 // Check if today's snapshots exist
 $today = date('Y-m-d');
-$check_beginning = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHERE snapshot_date = '$today' AND snapshot_type = 'beginning'")->fetch_assoc()['c'];
-$check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHERE snapshot_date = '$today' AND snapshot_type = 'ending'")->fetch_assoc()['c'];
+$stmt_check = $conn->prepare("SELECT COUNT(*) as c FROM inventory_snapshots WHERE snapshot_date = ? AND snapshot_type = 'beginning'");
+$stmt_check->bind_param('s', $today);
+$stmt_check->execute();
+$check_beginning = $stmt_check->get_result()->fetch_assoc()['c'];
+$stmt_check->close();
+
+$stmt_check2 = $conn->prepare("SELECT COUNT(*) as c FROM inventory_snapshots WHERE snapshot_date = ? AND snapshot_type = 'ending'");
+$stmt_check2->bind_param('s', $today);
+$stmt_check2->execute();
+$check_ending = $stmt_check2->get_result()->fetch_assoc()['c'];
+$stmt_check2->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -107,33 +125,15 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Beginning & Ending Inventory - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<link rel="stylesheet" href="../styles/admin-style.css">
-<style>
-.quick-actions {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-}
-.snapshot-card {
-    background: white;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-}
-.comparison-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-}
-@media (max-width: 768px) {
-    .comparison-grid {
-        grid-template-columns: 1fr;
+<link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+<link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
+<script>
+(function(){
+    if (localStorage.getItem('sidebarCollapsed') === 'true') {
+        document.documentElement.classList.add('sidebar-will-collapse');
     }
-}
-.alert-success { background: #e6ffed; padding: 12px; border-radius: 6px; margin: 10px 0; border: 1px solid #b7f0c6; }
-.alert-error { background: #ffe6e6; padding: 12px; border-radius: 6px; margin: 10px 0; border: 1px solid #f0b7b7; }
-</style>
+})();
+</script>
 </head>
 <body class="shukran-admin">
 
@@ -141,11 +141,7 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
 
 <div class="main-content">
     <div class="top-bar">
-        <h1>📊 Beginning & Ending Inventory</h1>
-        <div class="user-info">
-            <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span>
-            <a href="../auth/logout.php" class="btn-logout">Logout</a>
-        </div>
+        <h1>Beginning & Ending Inventory</h1>
     </div>
 
     <?php if ($msg): ?><div class="alert-success">✅ <?= htmlspecialchars($msg) ?></div><?php endif; ?>
@@ -155,13 +151,13 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
         <h2>Quick Actions for Today (<?= date('M d, Y') ?>)</h2>
         <div class="quick-actions">
             <?php if ($check_beginning == 0): ?>
-                <a href="?auto_snapshot&type=beginning" class="btn-primary">📸 Capture Beginning Inventory</a>
+                <a href="?auto_snapshot&type=beginning" class="btn-primary">Capture Beginning Inventory</a>
             <?php else: ?>
                 <span class="badge badge-success">✅ Beginning snapshot exists</span>
             <?php endif; ?>
             
             <?php if ($check_ending == 0): ?>
-                <a href="?auto_snapshot&type=ending" class="btn-primary">📸 Capture Ending Inventory</a>
+                <a href="?auto_snapshot&type=ending" class="btn-primary">Capture Ending Inventory</a>
             <?php else: ?>
                 <span class="badge badge-success">✅ Ending snapshot exists</span>
             <?php endif; ?>
@@ -170,7 +166,7 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
 
     <div class="snapshot-card">
         <h2>Create Manual Snapshot</h2>
-        <form method="POST" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;">
+        <form method="POST" class="display-flex gap-10 align-items-end flex-wrap">
             <div>
                 <label>Date</label>
                 <input type="date" name="snapshot_date" value="<?= date('Y-m-d') ?>" required>
@@ -198,7 +194,7 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
     <div class="snapshot-card">
         <h2>View Snapshots</h2>
         <label>Select Date:</label>
-        <select onchange="window.location='?date='+this.value" style="padding:8px;border-radius:6px;border:1px solid #ddd;margin-bottom:20px;">
+        <select onchange="window.location='?date='+this.value" class="select-standard">
             <option value="">-- Select Date --</option>
             <?php foreach ($snapshot_dates as $sd): ?>
                 <option value="<?= $sd['snapshot_date'] ?>" <?= $selected_date == $sd['snapshot_date'] ? 'selected' : '' ?>>
@@ -212,9 +208,9 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
                 <div>
                     <h3>Beginning Inventory</h3>
                     <?php if (empty($beginning_inventory)): ?>
-                        <p style="color:#999;padding:20px;background:#f9f9f9;border-radius:6px;text-align:center;">No beginning inventory snapshot for this date</p>
+                        <p class="empty-state-message">No beginning inventory snapshot for this date</p>
                     <?php else: ?>
-                        <table class="data-table" style="font-size:13px;">
+                        <table class="data-table table-small-text">
                             <thead>
                                 <tr>
                                     <th>Item</th>
@@ -236,7 +232,7 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
                                         <td>₱<?= number_format($item['total_value'], 2) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
-                                <tr style="background:#f0f8ff;font-weight:bold;">
+                                <tr class="table-row-total">
                                     <td colspan="3">TOTAL</td>
                                     <td>₱<?= number_format($total_beginning, 2) ?></td>
                                 </tr>
@@ -248,9 +244,9 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
                 <div>
                     <h3>Ending Inventory</h3>
                     <?php if (empty($ending_inventory)): ?>
-                        <p style="color:#999;padding:20px;background:#f9f9f9;border-radius:6px;text-align:center;">No ending inventory snapshot for this date</p>
+                        <p class="empty-state-message">No ending inventory snapshot for this date</p>
                     <?php else: ?>
-                        <table class="data-table" style="font-size:13px;">
+                        <table class="data-table table-small-text">
                             <thead>
                                 <tr>
                                     <th>Item</th>
@@ -272,7 +268,7 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
                                         <td>₱<?= number_format($item['total_value'], 2) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
-                                <tr style="background:#f0f8ff;font-weight:bold;">
+                                <tr class="table-row-total">
                                     <td colspan="3">TOTAL</td>
                                     <td>₱<?= number_format($total_ending, 2) ?></td>
                                 </tr>
@@ -283,12 +279,12 @@ $check_ending = $conn->query("SELECT COUNT(*) as c FROM inventory_snapshots WHER
             </div>
 
             <?php if (!empty($beginning_inventory) && !empty($ending_inventory)): ?>
-                <div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:6px;">
+                <div class="info-summary-box">
                     <h3>Summary for <?= date('M d, Y', strtotime($selected_date)) ?></h3>
                     <p><strong>Beginning Inventory Value:</strong> ₱<?= number_format($total_beginning ?? 0, 2) ?></p>
                     <p><strong>Ending Inventory Value:</strong> ₱<?= number_format($total_ending ?? 0, 2) ?></p>
                     <p><strong>Change:</strong> 
-                        <span style="color:<?= ($total_ending - $total_beginning) < 0 ? 'red' : 'green' ?>">
+                        <span class="color-conditional" style="color:<?= ($total_ending - $total_beginning) < 0 ? 'red' : 'green' ?>">
                             ₱<?= number_format($total_ending - $total_beginning, 2) ?>
                             (<?= number_format((($total_ending - $total_beginning) / max($total_beginning, 1)) * 100, 1) ?>%)
                         </span>

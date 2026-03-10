@@ -9,12 +9,12 @@
         </div>
     </div>
     <div class="sidebar-user-header">
-        <div class="user-avatar" style="background:#fff3; border-radius:50%; width:48px; height:48px; display:flex; align-items:center; justify-content:center; font-size:24px; color:#fff; margin:0 auto 8px auto;">
+        <div class="user-avatar">
             <i class='bx bx-user'></i>
         </div>
-        <div class="user-info" style="text-align:center; color:#fff;">
-            <div style="font-weight:600; font-size:15px;">Staff User</div>
-            <div style="font-size:12px; opacity:0.8;">Logged in</div>
+        <div class="user-info user-info-centered">
+            <div class="user-info-name">Staff User</div>
+            <div class="user-info-status">Logged in</div>
         </div>
     </div>
     <nav class="sidebar-nav">
@@ -51,23 +51,3 @@
     });
 })();
 </script>
-<style>
-.sidebar-footer {
-    position: absolute;
-    bottom: 0;
-    width: 100%;
-    padding-bottom: 20px;
-}
-.sidebar-footer .nav-item {
-    border-top: 1px solid rgba(255,255,255,0.08);
-    margin-top: 10px;
-    padding-top: 18px;
-    color: #fff;
-    justify-content: flex-start;
-}
-.sidebar-user-header {
-    padding: 24px 0 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    margin-bottom: 8px;
-}
-</style>

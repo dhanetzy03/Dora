@@ -4,61 +4,124 @@
 
 ---
 
+## ⚡ QUICK START (RECOMMENDED)
+
+### **Single-Step Setup** ✅
+The main database file now includes ALL features. No need to run migrations separately!
+
+1. **Import the Database:**
+   ```bash
+   # Using phpMyAdmin:
+   # 1. Open http://localhost/phpmyadmin
+   # 2. Click "Import" tab
+   # 3. Choose file: database/shukran_cafe.sql
+   # 4. Click "Go"
+   ```
+
+2. **That's it!** All tables and features are now ready.
+
+---
+
 ## Database Structure
 
 ### Database Name
 `shukran_cafe`
 
-### Tables Overview
+### Tables Overview (14 Tables Total)
 
-1. **users** - User accounts (Admin and Staff)
+**Core Tables:**
+1. **users** - User accounts (Admin and Staff) with last_login tracking
 2. **categories** - Product categories
 3. **suppliers** - Supplier information
-4. **products** - Product/Item information (ready for future inventory)
-5. **stock** - Current stock levels (ready for inventory tracking)
-6. **stock_movements** - Stock movement tracking (Enhanced Stock Monitoring)
-7. **sales** - Sales transactions (Sales Validation)
-8. **sale_items** - Individual items in sales
-9. **purchases** - Purchase orders from suppliers
-10. **purchase_items** - Individual items in purchases
-11. **activity_logs** - System activity audit trail
+4. **products** - Product information with pricing and shelf life
+5. **inventory** - Main inventory with cost tracking, shelf life, and expiry dates
+6. **stock** - Current stock levels with expiry tracking
+7. **stock_movements** - Stock movement tracking with spoilage support
+8. **raw_materials** - Raw materials inventory (separate tracking)
+
+**Transaction Tables:**
+9. **sales** - Sales transactions with validation
+10. **sale_items** - Individual items in sales with markup tracking
+11. **purchases** - Purchase orders from suppliers
+12. **purchase_items** - Individual items in purchases
+
+**Enhanced Features Tables:**
+13. **spoilage_records** - Spoilage tracking with financial loss calculation
+14. **inventory_snapshots** - Beginning/ending inventory snapshots
+15. **activity_logs** - System activity audit trail
+
+---
+
+## ✨ Features Included
+
+### ✅ Panelist Requirements (All Implemented)
+1. **Shelf Life Tracking** - Track expiry dates for each item
+2. **Spoilage Monitoring** - Record and monitor spoiled items
+3. **Beginning/Ending Inventory** - Daily inventory snapshots
+4. **Complete Reports** - Six comprehensive report types
+5. **Sales Validation** - Admin validation of sales transactions
+6. **Stock Monitoring** - Real-time stock level tracking
 
 ---
 
 ## Installation Steps
 
-### 1. Import Database
-
-**Using phpMyAdmin:**
-1. Open phpMyAdmin (usually at `http://localhost/phpmyadmin`)
+### Option 1: Using phpMyAdmin (Recommended for Beginners)
+1. Open phpMyAdmin at `http://localhost/phpmyadmin`
 2. Click on "Import" tab
-3. Choose file: `database/shukran_cafe.sql`
-4. Click "Go" button
+3. Click "Choose File" and select `database/shukran_cafe.sql`
+4. Click "Go" button at the bottom
+5. Wait for the import to complete (should take less than 10 seconds)
 
-**Using MySQL Command Line:**
+### Option 2: Using MySQL Command Line
 ```bash
 mysql -u root -p < database/shukran_cafe.sql
 ```
 
-### 2. Verify Database Connection
+### Option 3: Using Windows Batch File
+Double-click: `run_all_migrations.bat` (if migrations need to be reapplied)
 
-The database connection is configured in:
-```
+---
+
 ## Default Credentials
 
 ### Admin Account
-- **Username:** `admin`
-- **Password:** `admin123`
-### 2. Database Helper Functions
- `get_current_user_data()` - Get current user info
+- **Username:** `admintester`
+- **Password:** `test123`
 
-- `db_query()` - Execute prepared statements
-- `db_fetch_one()` - Fetch single row
-- `db_fetch_all()` - Fetch all rows
-- `db_insert()` - Insert data
-- `db_update()` - Update data
-- `db_delete()` - Delete data
-- `log_activity()` - Log system activities
+### Staff Account
+- **Username:** `staffuser`
+- **Password:** `test123`
+
+**⚠️ IMPORTANT:** Change these passwords after initial setup for production use!
+
+---
+
+## 🔧 Configuration
+
+### Database Connection
+The database connection is configured in:
+**File:** `config/db_connect.php`
+
+```php
+$servername = "localhost";
+$username = "root";
+$password = "";
+$dbname = "shukran_cafe";
+```
+
+Update these values if your MySQL configuration is different.
+
+---
+
+## 📚 Helper Functions Available
+
+### 1. Session Management
+**File:** `config/session.php`
+
+Available functions:
+- `is_logged_in()` - Check if user is logged in
+-
 - `validate_user()` - User authentication
 - `check_permission()` - Permission checking
 - `sanitize_input()` - Input sanitization

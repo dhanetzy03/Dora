@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../auth/login.php");
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $movement_qty = $quantity;
     } else {
         $new_stock = $current_stock - $quantity;
-        $movement_qty = -$quantity;
+        $movement_qty = $quantity;
     }
 
     if ($new_stock < 0) {
@@ -115,10 +115,7 @@ $page_title = "Adjusting Entry";
     <title><?= htmlspecialchars($page_title) ?> - Shukran Café</title>
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
     <link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
-    <style> /* minimal layout fallback */
-    body.shukran-admin{font-family:Segoe UI,Arial,Helvetica;background:#f6f7fb}
-    .main-content{padding:24px}
-    </style>
+    <link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
 </head>
 <body class="shukran-admin">
 <?php include 'sidebar.php'; ?>
@@ -154,7 +151,7 @@ $page_title = "Adjusting Entry";
                         </option>
                     <?php endforeach; ?>
                 </select>
-                <div id="currentStockDisplay" style="margin-top:8px; font-size:14px; color:#333">Current stock: <strong id="currentStockValue">-</strong></div>
+                <div id="currentStockDisplay" class="margin-top-8 font-size-14 color-333">Current stock: <strong id="currentStockValue">-</strong></div>
             </div>
 
             <div class="form-group">

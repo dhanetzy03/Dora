@@ -44,7 +44,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
       // Redirect based on role
       if ($user["role"] === "admin") {
-        header("Location: ../admindash/admin.php");
+        header("Location: ../admindash/dashboard.php");
         exit();
       } else {
         header("Location: ../dashboard/staff.php");
@@ -459,7 +459,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
 
         <button type="submit" class="login-btn">
-          <i class='bx bx-log-in' style="margin-right: 8px;"></i> Sign In
+          <i class='bx bx-log-in margin-right-8'></i> Sign In
         </button>
 
         <div class="form-footer">

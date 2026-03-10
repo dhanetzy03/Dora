@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../auth/login.php");
@@ -343,451 +343,29 @@ $slow_moving_count = $conn->query("SELECT COUNT(i.id) as c
 <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
 <title>Inventory Management - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<!-- Inline full admin CSS to prevent FOUC on first load -->
-<style>
-body.shukran-admin * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-body.shukran-admin {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
-    display: flex;
-    min-height: 100vh;
-}
-
-/* Sidebar Styles */
-.sidebar {
-    width: 260px;
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-    color: white;
-    padding: 0;
-    position: fixed;
-    height: 100vh;
-    overflow-y: auto;
-    z-index: 1002;
-    transition: transform 0.25s ease, width 0.25s ease;
-}
-
-/* Sidebar header / toggle */
-.sidebar-header {
-    padding: 18px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-
-/* Sidebar header / toggle */
-.sidebar-header {
-    padding: 30px 20px;
-    text-align: center;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-}
-
-.sidebar-header h2 {
-    font-size: 24px;
-    margin-bottom: 5px;
-}
-
-.sidebar-header p {
-    font-size: 12px;
-    opacity: 0.8;
-}
-
-.sidebar-nav {
-    padding: 20px 0;
-}
-
-.nav-item {
-    display: flex;
-    align-items: center;
-    padding: 15px 25px;
-    color: rgba(255,255,255,0.8);
-    text-decoration: none;
-    transition: all 0.3s;
-    border-left: 3px solid transparent;
-}
-
-.nav-item:hover {
-    background: rgba(255,255,255,0.1);
-    color: white;
-}
-
-.nav-item.active {
-    background: rgba(255,255,255,0.15);
-    color: white;
-    border-left-color: white;
-}
-
-.nav-item i {
-    font-size: 20px;
-    margin-right: 15px;
-}
-
-/* Main Content (support both .main-content and legacy .main) */
-.main-content,
-.main {
-    margin-left: 260px !important; /* account for fixed sidebar width */
-    flex: 1;
-    padding: 18px 16px; /* reduce horizontal padding so content aligns closer to sidebar */
-    min-height: 100vh;
-    background: transparent;
-    position: relative;
-    transition: margin-left 0.22s ease, width 0.22s ease;
-}
-
-/* Ensure main area fills remaining width beside the fixed sidebar */
-.main-content, .main {
-    width: calc(100% - 260px) !important;
-}
-
-/* Responsive: collapse sidebar on small screens and let main be full width */
-@media (max-width: 900px) {
-    .sidebar { transform: translateX(-260px); }
-    .main-content, .main { margin-left: 0 !important; width: 100% !important; }
-}
-
-/* Collapsed sidebar state (toggle on body.collapsed) */
-body.collapsed .sidebar {
-    transform: translateX(-220px);
-}
-
-body.collapsed .main-content,
-body.collapsed .main {
-    margin-left: 60px;
-}
-
-body.collapsed .main-content,
-body.collapsed .main {
-    width: calc(100% - 60px);
-}
-
-/* Make sure sidebar nav stays scrollable and doesn't overlap content */
-.sidebar-nav { padding: 18px 0 30px; }
-.sidebar { box-shadow: 2px 0 8px rgba(0,0,0,0.08); }
-
-/* Ensure sidebar header sticks on top when scrolling */
-.sidebar-header { position: sticky; top: 0; z-index: 2; }
-
-/* Ensure top bar spacing when using fixed header */
-.main .top-bar,
-.main-content .top-bar {
-    margin-bottom: 18px;
-}
-
-.top-bar {
-    background: white;
-    padding: 20px 30px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.top-bar h1 {
-    font-size: 24px;
-    color: #333;
-}
-
-.user-info {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-.user-info span {
-    color: #666;
-}
-
-.btn-logout {
-    background: #f44336;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 6px;
-    text-decoration: none;
-    transition: all 0.3s;
-}
-
-.btn-logout:hover {
-    background: #d32f2f;
-}
-
-/* Stats Grid */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    padding: 30px;
-}
-
-.stat-card {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    transition: transform 0.3s;
-}
-
-.stat-card:hover {
-    transform: translateY(-5px);
-}
-
-.stat-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.stat-icon i {
-    font-size: 28px;
-}
-
-.stat-info h3 {
-    font-size: 32px;
-    color: #333;
-    margin-bottom: 5px;
-}
-
-.stat-info p {
-    color: #666;
-    font-size: 14px;
-}
-
-/* Content Card */
-.content-card {
-    margin: 0 0 30px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    overflow: hidden;
-}
-
-.card-header {
-    padding: 25px;
-    border-bottom: 1px solid #eee;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.card-header h2 {
-    font-size: 20px;
-    color: #333;
-}
-
-.btn-primary {
-    background: #4a5568;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.3s;
-}
-
-.btn-primary:hover {
-    background: #2d3748;
-}
-
-.btn-secondary {
-    background: #6c757d;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    cursor: pointer;
-}
-
-.btn-secondary:hover {
-    background: #5a6268;
-}
-
-/* Table Styles */
-.table-responsive {
-    overflow-x: auto;
-}
-
-.data-table {
-    width: 100%;
-    border-collapse: collapse;
-}
-
-.data-table thead {
-    background: #f8f9fa;
-}
-
-.data-table th,
-data truncated for brevity (same CSS)
-</style>
-<!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
 <link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+<link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
 <script>
 // Apply sidebar state BEFORE body renders to prevent layout shift
-// DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
 (function(){
     var storedState = localStorage.getItem('sidebarCollapsed');
-    // Only collapse if explicitly set to 'true' in localStorage
     if (storedState === 'true') {
         document.documentElement.classList.add('sidebar-will-collapse');
     }
-    // Otherwise default is expanded (no class needed)
 })();
 </script>
 
-<style>
-/* Base Modal Styles */
-.modal {
-    display: none; 
-    position: fixed; 
-    z-index: 3000; 
-    left: 0;
-    top: 0;
-    width: 100%; 
-    height: 100%; 
-    background-color: rgba(0,0,0,0.45);
-    /* Use flex container when visible so content can be perfectly centered */
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-}
-
-.modal-content {
-    background-color: #fefefe;
-    margin: 0 auto; 
-    padding: 20px;
-    border: 1px solid #888;
-    width: 100%; 
-    max-width: 900px;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    max-height: 90vh;
-    overflow: auto;
-}
-/* NEW STYLE: Style for the new log modal to be wider */
-#logModal .modal-content {
-    max-width: 900px;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid #eee;
-    padding-bottom: 10px;
-    margin-bottom: 15px;
-}
-
-.close {
-    color: #aaa;
-    font-size: 28px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.close:hover,
-.close:focus {
-    color: #000;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-/* FIX: Ensure table actions are clickable */
-.data-table td:last-child {
-    /* Center action buttons; delete button will be pushed to the right with margin-left:auto */
-    position: relative;
-    z-index: 10;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-/* Place delete button to the far right of the actions cell without absolute positioning */
-.data-table td:last-child .delete-icon {
-    margin-left: auto;
-    position: relative;
-    background: transparent;
-    border: none;
-    padding: 6px;
-}
-
-/* Remove default focus outline for icon buttons */
-.btn-icon:focus { outline: none; box-shadow: none; }
-
-/* Ensure delete icon color */
-.data-table td:last-child .delete-icon i { color: #f44336; }
-
-/* Optional: Ensure icon buttons are visually distinct and interactive */
-.btn-icon {
-    cursor: pointer;
-    background: none;
-    border: none;
-    padding: 5px;
-    margin: 0 2px;
-    color: #5a67d8; /* Example color */
-    transition: color 0.2s;
-}
-.btn-icon:hover {
-    color: #3f479a;
-}
-
-/* FIX: Ensure radio buttons are vertically aligned with their text */
-.form-row input[type="radio"] {
-    vertical-align: middle;
-}
-/* Style for delete button icon */
-.delete-icon {
-    color: #f44336; /* Red color for delete */
-}
-
-/* Form layout improvements for modals */
-.form-row {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-.label-normal {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-}
-
-/* Modal footer buttons alignment */
-.modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    padding-top: 12px;
-}
-
-/* Ensure inputs inside modal take full width where intended */
-.modal .form-group input[type="text"],
-.modal .form-group input[type="number"],
-.modal .form-group textarea, .modal .form-group select {
-    width: 100%;
-    box-sizing: border-box;
-}
-</style>
 </head>
 <body class="shukran-admin">
 
 <?php include 'sidebar.php'; ?>
 
 <div class="main-content">
-    <div class="top-bar">
-        <h1>📦 Inventory Management</h1>
-        <div class="user-info">
-            <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span>
-            <a href="../auth/logout.php" class="btn-logout">Logout</a>
+    <!-- Modern Gradient Inventory Header -->
+    <div class="dashboard-header">
+        <div class="dashboard-header-content">
+            <h1><i class='bx bx-package'></i> Inventory Management</h1>
+            <p class="dashboard-subtitle">Manage your stock levels • <?= date('F j, Y') ?></p>
         </div>
     </div>
 
@@ -925,7 +503,7 @@ data truncated for brevity (same CSS)
                             <?php if ($expiry_date): ?>
                                 <?= date('M d, Y', strtotime($expiry_date)) ?>
                                 <?php if ($expiry_status): ?>
-                                    <br><small style="color:red;font-weight:bold;"><?= $expiry_status ?></small>
+                                    <br><small class="color-red font-weight-bold"><?= $expiry_status ?></small>
                                 <?php endif; ?>
                             <?php else: ?>
                                 N/A
@@ -1027,7 +605,7 @@ data truncated for brevity (same CSS)
                 <div class="form-group">
                     <label>Shelf Life (Days)</label>
                     <input type="number" name="shelf_life_days" min="1" placeholder="e.g., 7, 30, 90">
-                    <small style="color:#666;">Optional: Enter days until item expires</small>
+                    <small class="color-666">Optional: Enter days until item expires</small>
                 </div>
                 <div class="form-group">
                     <label>Date Received</label>

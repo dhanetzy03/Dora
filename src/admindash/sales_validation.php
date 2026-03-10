@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 // Allow both admin and staff to view this page and use read-only AJAX endpoints.
 // Admin-only actions (validate, update_markup) are checked later where executed.
@@ -216,7 +216,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $stmt_stock->close();
 
         // Insert stock movement linking to sale
-        $sale_num = $conn->query("SELECT sale_number FROM sales WHERE sale_id = $sale_id")->fetch_assoc()['sale_number'] ?? null;
+        $stmt_num = $conn->prepare("SELECT sale_number FROM sales WHERE sale_id = ?");
+        $stmt_num->bind_param('i', $sale_id);
+        $stmt_num->execute();
+        $sale_num = $stmt_num->get_result()->fetch_assoc()['sale_number'] ?? null;
+        $stmt_num->close();
+        
         $unit_cost_for_movement = $unit_price; // best-effort
         $stmt_mov = $conn->prepare("INSERT INTO stock_movements (product_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, sale_ref_id, unit_cost_at_movement, reference_number, remarks, created_by, created_at) VALUES (?, 'out', ?, ?, ?, 'sale', ?, ?, ?, ?, ?, NOW())");
         $remarks = "Admin backfill";
@@ -269,130 +274,29 @@ $total_validated = $conn->query("SELECT COUNT(*) as c FROM sales s WHERE s.statu
 <meta http-equiv="Cache-Control" content="no-store, must-revalidate">
 <title>Sales Validation - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<!-- Inline full admin CSS to prevent FOUC on first load -->
-<style>
-body.shukran-admin * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-body.shukran-admin {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
-    display: flex;
-    min-height: 100vh;
-}
 
-/* Sidebar Styles */
-.sidebar {
-    width: 260px;
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
-    color: white;
-    padding: 0;
-    position: fixed;
-    height: 100vh;
-    overflow-y: auto;
-    z-index: 1002;
-    transition: transform 0.25s ease, width 0.25s ease;
-}
-
-/* Sidebar header / toggle */
-.sidebar-header {
-    padding: 18px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-
-...css truncated for brevity...
-</style>
-<!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
 <link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+<link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
 <script>
 // Apply sidebar state BEFORE body renders to prevent layout shift
-// DEFAULT: Sidebar is EXPANDED unless explicitly saved as collapsed
 (function(){
     var storedState = localStorage.getItem('sidebarCollapsed');
-    // Only collapse if explicitly set to 'true' in localStorage
     if (storedState === 'true') {
         document.documentElement.classList.add('sidebar-will-collapse');
     }
-    // Otherwise default is expanded (no class needed)
 })();
 </script>
-<!-- Inline full admin CSS to prevent FOUC on first load -->
-<style>
-/* Additional Sales Validation Styles */
-.markup-input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 14px;
-}
-
-.markup-input:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
-}
-
-.markup-cell {
-    white-space: nowrap;
-}
-
-.text-center {
-    text-align: center;
-}
-
-.alert-success {
-    margin: 15px 30px;
-    padding: 15px;
-    background: #d4edda;
-    color: #155724;
-    border-radius: 8px;
-    border-left: 4px solid #28a745;
-}
-
-/* Modal positioning (ensure centered and responsive) */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 2000;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.45);
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-}
-.modal .modal-content {
-    background: #fff;
-    width: 100%;
-    max-width: 900px;
-    border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-    animation: slideDown 0.2s ease-out;
-    overflow: auto;
-    max-height: 90vh;
-}
-.modal .close {
-    cursor: pointer;
-    font-size: 20px;
-}
-</style>
-<!-- External CSS still loaded for browser cache and dev tools (with cache-busting) -->
-<link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
 </head>
 <body class="shukran-admin">
 
 <?php include 'sidebar.php'; ?>
 
 <div class="main-content">
-    <div class="top-bar">
-        <h1>💸 Sales Validation & Monitoring</h1>
-        <div class="user-info">
-            <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span>
-            <a href="../auth/logout.php" class="btn-logout">Logout</a>
+    <!-- Modern Gradient Sales Validation Header -->
+    <div class="dashboard-header">
+        <div class="dashboard-header-content">
+            <h1><i class='bx bx-check-double'></i> Sales Validation & Monitoring</h1>
+            <p class="dashboard-subtitle">Review and validate transactions • <?= date('F j, Y') ?></p>
         </div>
     </div>
 
@@ -524,7 +428,7 @@ body.shukran-admin {
             </table>
         </div>
         
-            <div class="text-right table-margin-top" style="margin-top:0;">
+            <div class="text-right table-margin-top margin-top-0">
                 <button class="btn-secondary" onclick="closeDetailsModal()">Close Review</button>
                 <?php if ($is_admin): ?>
                 <form id="validationForm" method="POST" action="" class="inline-form">
@@ -534,7 +438,7 @@ body.shukran-admin {
                     </button>
                 </form>
                 <?php else: ?>
-                    <span style="margin-left:12px;color:#666">Only admins can mark sales as validated. Contact an admin to review this sale.</span>
+                    <span class="margin-left-12 color-666">Only admins can mark sales as validated. Contact an admin to review this sale.</span>
                 <?php endif; ?>
             </div>
     </div>
@@ -619,13 +523,13 @@ function showDetailsModal(saleId, saleNumber, saleDate) {
                         tableBody.innerHTML += movRow;
                     });
                     tableBody.innerHTML += `<tr><td colspan="7" class="empty-message">Note: These rows were reconstructed from stock movements linked to the sale. Confirm with records before relying on them.</td></tr>`;
-                    tableBody.innerHTML += `<tr><td colspan="7" style="padding-top:12px">
+                    tableBody.innerHTML += `<tr><td colspan="7" class="padding-top-12">
                                                 <strong>Admin:</strong> Add missing item to this sale —
                                                 <select id="adminAddProduct"></select>
-                                                <input id="adminAddQty" type="number" step="0.01" min="0.01" value="1" style="width:80px;margin-left:8px">
-                                                <input id="adminAddPrice" type="number" step="0.01" min="0" value="0.00" style="width:120px;margin-left:8px">
+                                                <input id="adminAddQty" type="number" step="0.01" min="0.01" value="1" class="width-80 margin-left-8">
+                                                <input id="adminAddPrice" type="number" step="0.01" min="0" value="0.00" class="width-120 margin-left-8">
                                                 <button id="adminAddBtn" class="btn btn-primary btn-sm" data-sale-id="${saleInfo ? saleInfo.sale_id : ''}">Add</button>
-                                                <div id="adminAddMsg" style="display:inline-block;margin-left:12px;color:#333"></div>
+                                                <div id="adminAddMsg" class="display-inline-block margin-left-12 color-333"></div>
                                             </td></tr>`;
                     setTimeout(() => populateAdminProductSelect(), 100);
                 } else if (saleInfo) {

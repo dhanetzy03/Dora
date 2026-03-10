@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 session_start();
 if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
     header("Location: ../auth/login.php");
@@ -93,10 +93,10 @@ switch ($report_type) {
 
     case 'expiry_alert':
         $report_title = 'Expiry Alert Report';
-        $days_ahead = 7; // Show items expiring within 7 days
+        $days_ahead = 7; // Show items expiring within 7 days or already expired
         $query = "SELECT * FROM inventory 
                   WHERE expiry_date IS NOT NULL 
-                  AND expiry_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL ? DAY)
+                  AND expiry_date <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
                   ORDER BY expiry_date ASC";
         $stmt = $conn->prepare($query);
         $stmt->bind_param("i", $days_ahead);
@@ -141,8 +141,17 @@ switch ($report_type) {
         $report_title = 'Beginning & Ending Inventory Report';
         $selected_date = $_GET['snapshot_date'] ?? date('Y-m-d');
         
-        $beginning = $conn->query("SELECT * FROM inventory_snapshots WHERE snapshot_date = '$selected_date' AND snapshot_type = 'beginning' ORDER BY item_name")->fetch_all(MYSQLI_ASSOC);
-        $ending = $conn->query("SELECT * FROM inventory_snapshots WHERE snapshot_date = '$selected_date' AND snapshot_type = 'ending' ORDER BY item_name")->fetch_all(MYSQLI_ASSOC);
+        $stmt_b = $conn->prepare("SELECT * FROM inventory_snapshots WHERE snapshot_date = ? AND snapshot_type = 'beginning' ORDER BY item_name");
+        $stmt_b->bind_param('s', $selected_date);
+        $stmt_b->execute();
+        $beginning = $stmt_b->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt_b->close();
+        
+        $stmt_e = $conn->prepare("SELECT * FROM inventory_snapshots WHERE snapshot_date = ? AND snapshot_type = 'ending' ORDER BY item_name");
+        $stmt_e->bind_param('s', $selected_date);
+        $stmt_e->execute();
+        $ending = $stmt_e->get_result()->fetch_all(MYSQLI_ASSOC);
+        $stmt_e->close();
         
         $report_data = ['beginning' => $beginning, 'ending' => $ending];
         
@@ -168,34 +177,19 @@ switch ($report_type) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= $report_title ?> - Shukran Café</title>
 <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-<link rel="stylesheet" href="../styles/admin-style.css">
-<style>
-.report-menu { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-.report-menu a { padding: 10px 16px; background: white; border-radius: 6px; text-decoration: none; color: #333; border: 2px solid #e0e0e0; transition: all 0.3s; }
-.report-menu a:hover, .report-menu a.active { background: #5a67d8; color: white; border-color: #5a67d8; }
-.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
-.summary-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-.summary-card h3 { font-size: 14px; color: #666; margin-bottom: 5px; }
-.summary-card .value { font-size: 24px; font-weight: bold; color: #5a67d8; }
-.filter-form { background: white; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
-.filter-form input, .filter-form select { padding: 8px; border: 1px solid #ddd; border-radius: 6px; }
-.print-btn { background: #27ae60; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; display: inline-block; }
-@media print {
-    .no-print { display: none !important; }
-    body { background: white; }
-}
-</style>
+<link rel="stylesheet" href="../styles/admin-style.css?v=DEFENSE2025">
+<link rel="stylesheet" href="../styles/shukran-theme.css?v=DEFENSE2025">
 </head>
 <body class="shukran-admin">
 
 <?php include 'sidebar.php'; ?>
 
 <div class="main-content">
-    <div class="top-bar no-print">
-        <h1>📊 Reports & Analytics</h1>
-        <div class="user-info">
-            <span>Welcome, <?= htmlspecialchars($_SESSION["username"]) ?></span>
-            <a href="../auth/logout.php" class="btn-logout">Logout</a>
+    <!-- Modern Gradient Reports Header -->
+    <div class="dashboard-header no-print">
+        <div class="dashboard-header-content">
+            <h1><i class='bx bx-line-chart'></i> Reports & Analytics</h1>
+            <p class="dashboard-subtitle">Comprehensive business insights • <?= date('F j, Y') ?></p>
         </div>
     </div>
 
@@ -316,7 +310,7 @@ switch ($report_type) {
                             <td><?= ucfirst($row['item_type']) ?></td>
                             <td><?= number_format($row['quantity_spoiled'], 2) ?> <?= $row['unit'] ?></td>
                             <td>₱<?= number_format($row['cost_per_unit'], 2) ?></td>
-                            <td style="color:#e74c3c;font-weight:bold;">₱<?= number_format($row['total_loss'], 2) ?></td>
+                            <td class="loss-amount">₱<?= number_format($row['total_loss'], 2) ?></td>
                             <td><span class="badge badge-warning"><?= ucfirst($row['spoilage_reason']) ?></span></td>
                             <td><?= htmlspecialchars($row['reason_details'] ?: '-') ?></td>
                             <td><?= htmlspecialchars($row['staff_name'] ?? 'System') ?></td>
@@ -391,10 +385,10 @@ switch ($report_type) {
             </table>
         
         <?php elseif ($report_type == 'beginning_ending'): ?>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <div class="display-grid grid-2-cols gap-20">
                 <div>
                     <h3>Beginning Inventory</h3>
-                    <table class="data-table" style="font-size:13px;">
+                    <table class="data-table table-small-text">
                         <thead>
                             <tr><th>Item</th><th>Qty</th><th>Cost</th><th>Value</th></tr>
                         </thead>
@@ -412,7 +406,7 @@ switch ($report_type) {
                 </div>
                 <div>
                     <h3>Ending Inventory</h3>
-                    <table class="data-table" style="font-size:13px;">
+                    <table class="data-table table-small-text">
                         <thead>
                             <tr><th>Item</th><th>Qty</th><th>Cost</th><th>Value</th></tr>
                         </thead>

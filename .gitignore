@@ -1,0 +1,6 @@
+# Documentation / internal guides
+guides/text/
+
+
+# Node (if ever used)
+node_modules/

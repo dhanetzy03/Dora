@@ -1,103 +1,190 @@
+/* ============================================
+   SHUKRAN CAFÉ - PROFESSIONAL ADMIN DASHBOARD
+   Modern, Clean, and Beautiful Design 2026
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 body.shukran-admin * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
+
 body.shukran-admin {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fa;
+    font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-attachment: fixed;
     display: flex;
     min-height: 100vh;
 }
 
-/* Sidebar Styles */
+/* ============================================
+   SIDEBAR - MODERN DESIGN
+   ============================================ */
 .sidebar {
-    width: 260px;
-    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    width: 280px;
+    background: #1e293b;
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
     color: white;
     padding: 0;
     position: fixed;
     height: 100vh;
     overflow-y: auto;
     z-index: 1002;
-    transition: transform 0.3s ease, width 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
 }
 
-/* Sidebar header / toggle */
-.sidebar-header {
-    padding: 18px 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+.sidebar::-webkit-scrollbar {
+    width: 6px;
 }
-.sidebar-brand { display:flex; align-items:center; justify-content:space-between; }
-.brand-text h2 { font-size:20px; margin:0; }
-.brand-text p { margin:0; font-size:12px; opacity:0.9; }
+
+.sidebar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Sidebar Header */
+.sidebar-header {
+    padding: 24px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.brand-text h2 {
+    font-size: 22px;
+    margin: 0;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fff 0%, #a0aec0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.brand-text p {
+    margin: 4px 0 0 0;
+    font-size: 11px;
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+}
+
 .sidebar-toggle {
-    background: transparent;
+    background: rgba(255, 255, 255, 0.1);
     border: none;
-    color: rgba(255,255,255,0.9);
+    color: white;
     font-size: 18px;
     cursor: pointer;
-    padding: 6px 8px;
-}
-.sidebar-toggle:focus { outline: 2px solid rgba(255,255,255,0.15); border-radius:4px; }
-
-.sidebar-header {
-    padding: 30px 20px;
-    text-align: center;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding: 8px 10px;
+    border-radius: 6px;
+    transition: all 0.3s ease;
 }
 
-.sidebar-header h2 {
-    font-size: 24px;
-    margin-bottom: 5px;
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.05);
 }
 
-.sidebar-header p {
-    font-size: 12px;
-    opacity: 0.8;
+.sidebar-toggle:focus {
+    outline: 2px solid rgba(255,255,255,0.3);
+    outline-offset: 2px;
 }
 
+/* Sidebar Navigation */
 .sidebar-nav {
-    padding: 20px 0;
+    padding: 20px 12px;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
-    padding: 15px 25px;
-    color: rgba(255,255,255,0.8);
+    padding: 14px 18px;
+    color: rgba(255,255,255,0.7);
     text-decoration: none;
-    transition: all 0.3s;
-    border-left: 3px solid transparent;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 10px;
+    margin-bottom: 6px;
+    position: relative;
+    overflow: hidden;
+}
+
+.nav-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 3px;
+    background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    transform: scaleY(0);
+    transition: transform 0.3s ease;
 }
 
 .nav-item:hover {
-    background: rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.08);
     color: white;
+    transform: translateX(4px);
+}
+
+.nav-item:hover::before {
+    transform: scaleY(1);
 }
 
 .nav-item.active {
-    background: rgba(255,255,255,0.15);
+    background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%);
     color: white;
-    border-left-color: white;
+    font-weight: 600;
+}
+
+.nav-item.active::before {
+    transform: scaleY(1);
 }
 
 .nav-item i {
-    font-size: 20px;
-    margin-right: 15px;
+    font-size: 22px;
+    margin-right: 14px;
+    min-width: 22px;
+    transition: transform 0.3s ease;
 }
 
-/* Main Content (support both .main-content and legacy .main) */
+.nav-item:hover i {
+    transform: scale(1.1);
+}
+
+.nav-item span {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* ============================================
+   MAIN CONTENT - PROFESSIONAL LAYOUT
+   ============================================ */
 .main-content,
 .main {
-    margin-left: 260px; /* account for fixed sidebar width */
+    margin-left: 280px;
     flex: 1;
-    padding: 30px 40px; /* improved spacing for breathing room */
+    padding: 30px 35px;
     min-height: 100vh;
     background: transparent;
     position: relative;
-    transition: margin-left 0.3s ease, width 0.3s ease;
-    width: calc(100% - 260px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: calc(100% - 280px);
     box-sizing: border-box;
 }
 
@@ -1064,5 +1151,468 @@ body.collapsed .nav-item i {
     .quick-action-link {
         width: 100%;
         justify-content: center;
+    }
+}
+
+/* ============================================
+   ADDITIONAL UTILITY CLASSES
+   Clean separation of inline styles (2026)
+   ============================================ */
+
+/* Dashboard layout grids */
+.dashboard-grid-2-1 {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 30px;
+    padding: 0 30px 30px;
+}
+
+.system-info-grid {
+    padding: 25px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.system-info-item p {
+    color: #666;
+    margin-bottom: 5px;
+}
+
+.system-info-item strong {
+    color: #333;
+}
+
+/* Card utilities */
+.card-margin-x-30 {
+    margin: 0 30px 30px;
+}
+
+.card-inner-padding {
+    padding: 20px;
+}
+
+/* Stock item styling */
+.stock-item {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stock-item-name {
+    display: block;
+    color: #333;
+}
+
+.stock-item-category {
+    color: #666;
+}
+
+.stock-item-qty {
+    color: #f44336;
+    font-size: 1.1em;
+}
+
+.stock-sufficient-message {
+    color: #4caf50;
+    text-align: center;
+    padding: 20px;
+}
+
+/* Link utilities */
+.link-gray {
+    color: #4a5568;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.link-gray:hover {
+    text-decoration: underline;
+}
+
+/* Badge utilities */
+.badge-xsmall {
+    font-size: 11px;
+}
+
+/* Text display utilities */
+.display-inline-block {
+    display: inline-block;
+}
+
+.color-white {
+    color: white;
+}
+
+.font-weight-500 {
+    font-weight: 500;
+}
+
+.margin-left-12 {
+    margin-left: 12px;
+}
+
+.margin-left-8 {
+    margin-left: 8px;
+}
+
+.margin-right-8 {
+    margin-right: 8px;
+}
+
+.margin-top-0 {
+    margin-top: 0;
+}
+
+.margin-top-8 {
+    margin-top: 8px;
+}
+
+.margin-top-12 {
+    margin-top: 12px;
+}
+
+.margin-top-20 {
+    margin-top: 20px;
+}
+
+.margin-bottom-12 {
+    margin-bottom: 12px;
+}
+
+.padding-top-12 {
+    padding-top: 12px;
+}
+
+.padding-20 {
+    padding: 20px;
+}
+
+.color-666 {
+    color: #666;
+}
+
+.color-333 {
+    color: #333;
+}
+
+.color-red {
+    color: #e74c3c;
+}
+
+.color-green {
+    color: green;
+}
+
+.font-weight-bold {
+    font-weight: bold;
+}
+
+.font-weight-700 {
+    font-weight: 700;
+}
+
+.text-align-right {
+    text-align: right;
+}
+
+/* Display utilities */
+.display-none {
+    display: none;
+}
+
+.margin-top-14 {
+    margin-top: 14px;
+}
+
+.display-flex {
+    display: flex;
+}
+
+.display-grid {
+    display: grid;
+}
+
+.grid-2-cols {
+    grid-template-columns: 1fr 1fr;
+}
+
+.gap-10 {
+    gap: 10px;
+}
+
+.gap-12 {
+    gap: 12px;
+}
+
+.gap-20 {
+    gap: 20px;
+}
+
+.align-items-center {
+    align-items: center;
+}
+
+.align-items-end {
+    align-items: end;
+}
+
+.justify-space-between {
+    justify-content: space-between;
+}
+
+.flex-wrap {
+    flex-wrap: wrap;
+}
+
+/* Width utilities */
+.width-80 {
+    width: 80px;
+}
+
+.width-100 {
+    width: 100px;
+}
+
+.width-120 {
+    width: 120px;
+}
+
+.width-140 {
+    width: 140px;
+}
+
+.width-260 {
+    min-width: 260px;
+}
+
+/* Input utilities */
+.input-padding-10 {
+    padding: 10px;
+}
+
+.input-border-radius-6 {
+    border-radius: 6px;
+}
+
+.input-border-gray {
+    border: 1px solid #cbd5e0;
+}
+
+/* Background utilities */
+.bg-white-fade {
+    background: #fff3;
+}
+
+.bg-light-blue {
+    background: #f0f8ff;
+}
+
+.bg-light-yellow {
+    background: #fff3cd;
+}
+
+.bg-light-gray {
+    background: #f9f9f9;
+}
+
+/* Border utilities */
+.border-radius-50 {
+    border-radius: 50%;
+}
+
+.border-radius-6 {
+    border-radius: 6px;
+}
+
+/* Size utilities */
+.size-48 {
+    width: 48px;
+    height: 48px;
+}
+
+/* User avatar */
+.user-avatar {
+    background: #fff3;
+    border-radius: 50%;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #fff;
+    margin: 0 auto 8px auto;
+}
+
+.user-info-centered {
+    text-align: center;
+    color: #fff;
+}
+
+.user-info-name {
+    font-weight: 600;
+    font-size: 15px;
+}
+
+.user-info-status {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+/* Table cell utilities */
+.td-center-gray {
+    text-align: center;
+    padding: 20px;
+    color: #999;
+}
+
+.td-center-gray-large {
+    text-align: center;
+    padding: 30px;
+    color: #999;
+}
+
+/* Display none */
+.display-none {
+    display: none;
+}
+
+/* Font size utilities */
+.font-size-13 {
+    font-size: 13px;
+}
+
+.font-size-14 {
+    font-size: 14px;
+}
+
+/* Button background utilities */
+.btn-bg-666 {
+    background: #666;
+}
+
+.btn-bg-red {
+    background: #e74c3c;
+}
+
+/* Info box */
+.info-box {
+    margin-top: 12px;
+    padding: 10px;
+    background: #f0f8ff;
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+.info-summary-box {
+    margin-top: 20px;
+    padding: 15px;
+    background: #fff3cd;
+    border-radius: 6px;
+}
+
+.color-conditional {
+    display: inline;
+}
+
+/* Select dropdown */
+.select-standard {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #ddd;
+    margin-bottom: 20px;
+}
+
+/* Message styling */
+.empty-state-message {
+    color: #999;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 6px;
+    text-align: center;
+}
+
+/* Table font size */
+.table-small-text {
+    font-size: 13px;
+}
+
+.table-row-total {
+    background: #f0f8ff;
+    font-weight: bold;
+}
+
+/* Loss display */
+.loss-amount {
+    color: #e74c3c;
+    font-weight: bold;
+}
+
+/* Stock monitoring utilities */
+.cost-display {
+    font-weight: 700;
+    color: #333;
+}
+
+.cost-amount {
+    color: #2d3748;
+}
+
+.cost-missing-text {
+    margin-left: 12px;
+    color: #a00;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.item-code-link {
+    font-weight: 700;
+}
+
+/* Modal utilities */
+.modal-padding {
+    padding: 20px;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-actions {
+    text-align: right;
+}
+
+/* Staff sale status badges */
+.status-completed {
+    color: green;
+    font-weight: bold;
+}
+
+.status-pending {
+    color: orange;
+    font-weight: bold;
+}
+
+.status-default {
+    color: #888;
+}
+
+/* Responsive adjustments for new utilities */
+@media (max-width: 768px) {
+    .dashboard-grid-2-1 {
+        grid-template-columns: 1fr;
+        padding: 0 15px 15px;
+    }
+
+    .system-info-grid {
+        grid-template-columns: 1fr;
+        padding: 15px;
+    }
+
+    .width-260 {
+        min-width: 100%;
     }
 }
