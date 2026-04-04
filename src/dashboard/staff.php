@@ -19,10 +19,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['record_sale']) || is
     $payment_method = $_POST['payment_method'];
     $staff_id = $_SESSION['user_id'];
 
+    $discount_type_input = strtolower(trim($_POST['discount_type'] ?? 'none'));
+    if (!in_array($discount_type_input, ['none', 'pwd', 'senior_citizen'], true)) {
+        $discount_type_input = 'none';
+    }
+    $discount_reference = trim($_POST['discount_reference'] ?? '');
+    $discount_rate = ($discount_type_input === 'pwd' || $discount_type_input === 'senior_citizen') ? 0.20 : 0.00;
+    $discount_amount = 0.00;
+
+    $has_discount_type = column_exists('sales', 'discount_type');
+    $has_discount_rate = column_exists('sales', 'discount_rate');
+    $has_discount_amount = column_exists('sales', 'discount_amount');
+    $has_discount_reference = column_exists('sales', 'discount_reference');
+
     // Insert sale (initial total can be 0, we'll update after items)
-    $stmt = $conn->prepare("INSERT INTO sales (sale_number, sale_date, customer_name, total_amount, payment_method, created_by, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')");
     $initial_total = $posted_total ?: 0.00;
-    $stmt->bind_param("sssdsi", $sale_number, $sale_date, $customer_name, $initial_total, $payment_method, $staff_id);
+    if ($has_discount_type && $has_discount_rate && $has_discount_amount && $has_discount_reference) {
+        $stmt = $conn->prepare("INSERT INTO sales (sale_number, sale_date, customer_name, total_amount, payment_method, discount_type, discount_rate, discount_amount, discount_reference, created_by, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')");
+        $stmt->bind_param("sssdssddsi", $sale_number, $sale_date, $customer_name, $initial_total, $payment_method, $discount_type_input, $discount_rate, $discount_amount, $discount_reference, $staff_id);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO sales (sale_number, sale_date, customer_name, total_amount, payment_method, created_by, status) VALUES (?, ?, ?, ?, ?, ?, 'pending')");
+        $stmt->bind_param("sssdsi", $sale_number, $sale_date, $customer_name, $initial_total, $payment_method, $staff_id);
+    }
 
     if ($stmt->execute()) {
         $sale_id = $conn->insert_id;
@@ -118,10 +136,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['record_sale']) || is
             }
         }
 
-        // If items were provided, update sales.total_amount with computed total
-        if (!empty($computed_total)) {
+        // Finalize total with discount rules (PWD / Senior Citizen)
+        $gross_total = !empty($computed_total) ? $computed_total : $initial_total;
+        $discount_amount = round($gross_total * $discount_rate, 2);
+        $net_total = max(0, $gross_total - $discount_amount);
+
+        if ($has_discount_type && $has_discount_rate && $has_discount_amount && $has_discount_reference) {
+            $update_sale = $conn->prepare("UPDATE sales SET total_amount = ?, discount_type = ?, discount_rate = ?, discount_amount = ?, discount_reference = ?, updated_at = NOW() WHERE sale_id = ?");
+            $update_sale->bind_param("dsddsi", $net_total, $discount_type_input, $discount_rate, $discount_amount, $discount_reference, $sale_id);
+        } else {
             $update_sale = $conn->prepare("UPDATE sales SET total_amount = ?, updated_at = NOW() WHERE sale_id = ?");
-            $update_sale->bind_param("di", $computed_total, $sale_id);
+            $update_sale->bind_param("di", $net_total, $sale_id);
+        }
+        if ($update_sale) {
             $update_sale->execute();
             $update_sale->close();
         }
@@ -134,6 +161,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['record_sale']) || is
                 'success' => true,
                 'sale_id' => $sale_id,
                 'sale_number' => $sale_number,
+                'gross_total' => number_format($gross_total, 2, '.', ''),
+                'discount_type' => $discount_type_input,
+                'discount_amount' => number_format($discount_amount, 2, '.', ''),
+                'net_total' => number_format($net_total, 2, '.', ''),
                 'message' => $success
             ]);
             if ($stmt) $stmt->close();
@@ -245,6 +276,14 @@ document.addEventListener('DOMContentLoaded', function () {
     const itemsTable = document.getElementById('itemsTable').querySelector('tbody');
     const itemsInput = document.getElementById('itemsInput');
     const totalInput = document.getElementById('totalAmountInput');
+    const discountTypeSelect = document.getElementById('discountType');
+    const discountRefInput = document.getElementById('discountReference');
+
+    function getDiscountRate() {
+        const t = (discountTypeSelect?.value || 'none').toLowerCase();
+        if (t === 'pwd' || t === 'senior_citizen') return 0.20;
+        return 0;
+    }
 
     function render() {
         itemsTable.innerHTML = '';
@@ -269,9 +308,24 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateTotals() {
-        const total = items.reduce((s, it) => s + (parseFloat(it.qty) * parseFloat(it.unit_price || it.price || 0)), 0);
-        if (totalInput) totalInput.value = total.toFixed(2);
+        const gross = items.reduce((s, it) => s + (parseFloat(it.qty) * parseFloat(it.unit_price || it.price || 0)), 0);
+        const discountRate = getDiscountRate();
+        const discountAmount = gross * discountRate;
+        const net = Math.max(0, gross - discountAmount);
+        if (totalInput) totalInput.value = net.toFixed(2);
         if (itemsInput) itemsInput.value = JSON.stringify(items);
+
+        const grossEl = document.getElementById('grossTotalText');
+        const discountEl = document.getElementById('discountAmountText');
+        const netEl = document.getElementById('netTotalText');
+        if (grossEl) grossEl.textContent = `Gross: ₱${gross.toFixed(2)}`;
+        if (discountEl) discountEl.textContent = `Discount: ₱${discountAmount.toFixed(2)}`;
+        if (netEl) netEl.textContent = `Net: ₱${net.toFixed(2)}`;
+
+        if (discountRefInput) {
+            discountRefInput.disabled = (discountRate === 0);
+            if (discountRate === 0) discountRefInput.value = '';
+        }
     }
 
     // Auto-fill unit price when a product is selected (uses data-price from option if available)
@@ -313,6 +367,10 @@ document.addEventListener('DOMContentLoaded', function () {
         render();
     });
 
+    if (discountTypeSelect) {
+        discountTypeSelect.addEventListener('change', updateTotals);
+    }
+
     itemsTable.addEventListener('click', (e) => {
         if (e.target.classList.contains('remove-item')) {
             const idx = parseInt(e.target.dataset.idx);
@@ -328,8 +386,9 @@ document.addEventListener('DOMContentLoaded', function () {
             // if there are items, ensure itemsInput contains them and total is set
             if (items.length > 0) {
                 itemsInput.value = JSON.stringify(items);
-                const totalForSubmit = items.reduce((s, it) => s + (parseFloat(it.qty) * parseFloat(it.unit_price || it.price || 0)), 0);
-                totalInput.value = totalForSubmit.toFixed(2);
+                const grossForSubmit = items.reduce((s, it) => s + (parseFloat(it.qty) * parseFloat(it.unit_price || it.price || 0)), 0);
+                const netForSubmit = Math.max(0, grossForSubmit - (grossForSubmit * getDiscountRate()));
+                totalInput.value = netForSubmit.toFixed(2);
             } else {
                 // if no items, ensure hidden input empty
                 itemsInput.value = '';
@@ -347,8 +406,9 @@ document.addEventListener('DOMContentLoaded', function () {
             fd.append('ajax_record_sale', '1');
             // ensure items and total are up to date
             itemsInput.value = JSON.stringify(items);
-            const totalForSubmit = items.reduce((s, it) => s + (parseFloat(it.qty) * parseFloat(it.unit_price || it.price || 0)), 0);
-            totalInput.value = totalForSubmit.toFixed(2);
+            const grossForSubmit = items.reduce((s, it) => s + (parseFloat(it.qty) * parseFloat(it.unit_price || it.price || 0)), 0);
+            const netForSubmit = Math.max(0, grossForSubmit - (grossForSubmit * getDiscountRate()));
+            totalInput.value = netForSubmit.toFixed(2);
             fd.set('total_amount', totalInput.value);
 
             // disable button while sending
@@ -409,7 +469,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
     </div>
 
-    Record Sale Form
+    <!-- Record Sale Form -->
     <div class="form-section">
         <h2>Record New Sale</h2>
         <form method="POST" id="saleForm">
@@ -432,10 +492,23 @@ document.addEventListener('DOMContentLoaded', function () {
                         <option value="">-- Select Payment Method --</option>
                         <option value="cash">Cash</option>
                         <option value="card">Card</option>
-                        <option value="card">Card</option>
                         <option value="gcash">GCash</option>
                         <option value="other">Other</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Discount Type</label>
+                    <select name="discount_type" id="discountType">
+                        <option value="none">No Discount</option>
+                        <option value="pwd">PWD (20%)</option>
+                        <option value="senior_citizen">Senior Citizen (20%)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>PWD/Senior ID Ref</label>
+                    <input type="text" name="discount_reference" id="discountReference" placeholder="ID number / reference" disabled>
                 </div>
 
                 <div class="form-group" style="grid-column: 1 / -1;">
@@ -471,6 +544,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
 
                     <input type="hidden" name="items" id="itemsInput" />
+                    <div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap;color:#4a5568;font-weight:600;">
+                        <span id="grossTotalText">Gross: ₱0.00</span>
+                        <span id="discountAmountText">Discount: ₱0.00</span>
+                        <span id="netTotalText">Net: ₱0.00</span>
+                    </div>
                 </div>
             </div>
 

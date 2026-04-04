@@ -7,6 +7,102 @@ if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
 require_once "../../config/db_connect.php";
 require_once "../../config/db_helper.php";
 
+function sync_inventory_row_to_raw_materials(mysqli $conn, int $inventoryId): void {
+    $stmt = $conn->prepare("SELECT id, item_code, item_name, category, unit, stock_qty, reorder_level, COALESCE(cost_per_unit,0) AS cost_per_unit FROM inventory WHERE id = ? LIMIT 1");
+    if (!$stmt) return;
+    $stmt->bind_param("i", $inventoryId);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return;
+    }
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) return;
+
+    $itemCode = trim((string)($row['item_code'] ?? ''));
+    $itemName = trim((string)($row['item_name'] ?? ''));
+    $category = trim((string)($row['category'] ?? ''));
+    $unit = trim((string)($row['unit'] ?? 'pcs'));
+    $stockQty = (float)($row['stock_qty'] ?? 0);
+    $reorderLevel = (int)($row['reorder_level'] ?? 0);
+    $costPerUnit = (float)($row['cost_per_unit'] ?? 0);
+
+    $isRaw = (strcasecmp($category, 'Raw') === 0) || (stripos($itemCode, 'RM-') === 0);
+    if (!$isRaw || $itemName === '') return;
+
+    if ($itemCode === '') {
+        $itemCode = 'RM-' . strtoupper(substr(md5($itemName . '-' . $inventoryId), 0, 10));
+        $u = $conn->prepare("UPDATE inventory SET item_code = ? WHERE id = ?");
+        if ($u) {
+            $u->bind_param("si", $itemCode, $inventoryId);
+            $u->execute();
+            $u->close();
+        }
+    }
+
+    $find = $conn->prepare("SELECT material_id FROM raw_materials WHERE material_code = ? OR LOWER(TRIM(material_name)) = LOWER(TRIM(?)) LIMIT 1");
+    if (!$find) return;
+    $find->bind_param("ss", $itemCode, $itemName);
+    if (!$find->execute()) {
+        $find->close();
+        return;
+    }
+    $existing = $find->get_result()->fetch_assoc();
+    $find->close();
+
+    if ($existing && isset($existing['material_id'])) {
+        $materialId = (int)$existing['material_id'];
+        $up = $conn->prepare("UPDATE raw_materials SET material_code = ?, material_name = ?, category = 'Raw', unit = ?, quantity = ?, cost_per_unit = ?, reorder_level = ?, last_updated = NOW() WHERE material_id = ?");
+        if ($up) {
+            $up->bind_param("sssddii", $itemCode, $itemName, $unit, $stockQty, $costPerUnit, $reorderLevel, $materialId);
+            $up->execute();
+            $up->close();
+        }
+    } else {
+        $ins = $conn->prepare("INSERT INTO raw_materials (material_code, material_name, category, unit, quantity, cost_per_unit, reorder_level, supplier_id, last_updated) VALUES (?, ?, 'Raw', ?, ?, ?, ?, NULL, NOW())");
+        if ($ins) {
+            $ins->bind_param("sssddi", $itemCode, $itemName, $unit, $stockQty, $costPerUnit, $reorderLevel);
+            $ins->execute();
+            $ins->close();
+        }
+    }
+}
+
+function delete_raw_material_mirror_for_inventory(mysqli $conn, int $inventoryId): void {
+    $q = $conn->prepare("SELECT item_code, item_name, category FROM inventory WHERE id = ? LIMIT 1");
+    if (!$q) return;
+    $q->bind_param("i", $inventoryId);
+    if (!$q->execute()) {
+        $q->close();
+        return;
+    }
+    $row = $q->get_result()->fetch_assoc();
+    $q->close();
+    if (!$row) return;
+
+    $itemCode = trim((string)($row['item_code'] ?? ''));
+    $itemName = trim((string)($row['item_name'] ?? ''));
+    $category = trim((string)($row['category'] ?? ''));
+    $isRaw = (strcasecmp($category, 'Raw') === 0) || (stripos($itemCode, 'RM-') === 0);
+    if (!$isRaw) return;
+
+    if ($itemCode !== '') {
+        $d = $conn->prepare("DELETE FROM raw_materials WHERE material_code = ?");
+        if ($d) {
+            $d->bind_param("s", $itemCode);
+            $d->execute();
+            $d->close();
+        }
+    } elseif ($itemName !== '') {
+        $d = $conn->prepare("DELETE FROM raw_materials WHERE LOWER(TRIM(material_name)) = LOWER(TRIM(?))");
+        if ($d) {
+            $d->bind_param("s", $itemName);
+            $d->execute();
+            $d->close();
+        }
+    }
+}
+
 // --- START: STOCK TRANSACTIONS FETCHING (NEW AJAX ENDPOINT) ---
 // This is the missing endpoint that fetches the data when you click the item code.
 if (isset($_GET['action']) && $_GET['action'] === 'fetch_transactions' && isset($_GET['item_id'])) {
@@ -82,6 +178,7 @@ if ($_SERVER["REQUEST_METHOD"] === "GET" && isset($_GET['delete_id'])) {
     $delete_id = (int)$_GET['delete_id'];
 
     if ($delete_id > 0) {
+        delete_raw_material_mirror_for_inventory($conn, $delete_id);
         // Prepare SQL statement for deletion
         $stmt_delete = $conn->prepare("DELETE FROM inventory WHERE id = ?");
         
@@ -166,6 +263,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['movement_type'])) {
                 $stmt_update->execute();
                 $stmt_update->close();
 
+                sync_inventory_row_to_raw_materials($conn, $product_id);
+
                 // 3. Log the stock movement
                 // UPDATED: Added unit_cost_at_movement and reference_number to the INSERT and bind_param
                 $stmt_log = $conn->prepare("INSERT INTO stock_movements (product_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, remarks, created_by, created_at, unit_cost_at_movement, reference_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)");
@@ -237,6 +336,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
                     $stmt->bind_param("sssidiissi", $item_name, $category, $unit, $cost_per_unit, $reorder_level, $status, $shelf_life_days, $date_received, $expiry_date, $item_id);
                     $stmt->execute();
                     $stmt->close();
+                    sync_inventory_row_to_raw_materials($conn, $item_id);
                 }
             } else {
                 $sql = "UPDATE inventory SET item_name = ?, category = ?, unit = ?, reorder_level = ?, status = ?, shelf_life_days = ?, date_received = ?, expiry_date = ?, last_updated = NOW() WHERE id = ?";
@@ -245,6 +345,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
                     $stmt->bind_param("sssiiissi", $item_name, $category, $unit, $reorder_level, $status, $shelf_life_days, $date_received, $expiry_date, $item_id);
                     $stmt->execute();
                     $stmt->close();
+                    sync_inventory_row_to_raw_materials($conn, $item_id);
                 }
             }
 
@@ -256,6 +357,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !isset($_POST['movement_type'])) {
                 if ($stmt) {
                     $stmt->bind_param("sssidiisss", $item_name, $category, $unit, $stock_qty, $cost_per_unit, $reorder_level, $status, $shelf_life_days, $date_received, $expiry_date);
                     if ($stmt->execute()) {
+                        $newInventoryId = (int)$stmt->insert_id;
+                        sync_inventory_row_to_raw_materials($conn, $newInventoryId);
                         // SUCCESS LOGIC REMOVED
                     } else {
                         if ($conn->errno == 1062) {

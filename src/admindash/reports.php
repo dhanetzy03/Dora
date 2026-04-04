@@ -7,8 +7,29 @@ if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
 require_once "../../config/db_connect.php";
 
 // Get date filters
-$from_date = isset($_POST['from_date']) ? $_POST['from_date'] : date('Y-m-d', strtotime('-30 days'));
-$to_date = isset($_POST['to_date']) ? $_POST['to_date'] : date('Y-m-d');
+$today = date('Y-m-d');
+$this_month_start = date('Y-m-01');
+$from_date = isset($_POST['from_date']) ? $_POST['from_date'] : $this_month_start;
+$to_date = isset($_POST['to_date']) ? $_POST['to_date'] : $today;
+
+// Quick presets
+if (isset($_POST['preset'])) {
+    $preset = trim((string)$_POST['preset']);
+    if ($preset === 'today') {
+        $from_date = $today;
+        $to_date = $today;
+    } elseif ($preset === 'this_month') {
+        $from_date = $this_month_start;
+        $to_date = $today;
+    }
+}
+
+// Safety: if user accidentally sets reversed range, normalize it
+if (strtotime($from_date) > strtotime($to_date)) {
+    $tmp = $from_date;
+    $from_date = $to_date;
+    $to_date = $tmp;
+}
 
 // Fetch sales reports within date range
 $query = "
@@ -18,6 +39,10 @@ $query = "
         s.sale_date,
         s.total_amount,
         s.payment_method,
+        s.discount_type,
+        s.discount_rate,
+        s.discount_amount,
+        s.discount_reference,
         s.status,
         u.username as staff_name,
         COUNT(si.sale_item_id) as item_count
@@ -35,11 +60,58 @@ $stmt->execute();
 $sales_reports = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
+$overall_completed_sales = (int)($conn->query("SELECT COUNT(*) as c FROM sales WHERE status='completed'")->fetch_assoc()['c'] ?? 0);
+$latest_completed_sale_date = null;
+$latestRow = $conn->query("SELECT sale_date FROM sales WHERE status='completed' ORDER BY sale_date DESC LIMIT 1");
+if ($latestRow && $r = $latestRow->fetch_assoc()) {
+    $latest_completed_sale_date = $r['sale_date'] ?? null;
+}
+
+$auto_adjusted_to_latest = false;
+if (empty($sales_reports) && $overall_completed_sales > 0 && $latest_completed_sale_date) {
+    $latest_day = date('Y-m-d', strtotime($latest_completed_sale_date));
+    $from_date = $latest_day;
+    $to_date = $latest_day;
+
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("ss", $from_date, $to_date);
+    $stmt->execute();
+    $sales_reports = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    $auto_adjusted_to_latest = true;
+}
+
 // Calculate summary statistics
 $total_sales = 0;
 $total_discount = 0;
 $payment_breakdown = ['CASH' => 0, 'GCASH' => 0, 'CARD' => 0, 'OTHER' => 0];
-$discount_breakdown = ['DISCOUNTED' => 0, 'NO_DISCOUNT' => 0];
+$discount_breakdown = ['PWD' => 0, 'SENIOR_CITIZEN' => 0];
+
+function resolve_discount_type(array $sale): string {
+    $typeCandidates = [];
+    foreach (['discount_type', 'discount_name', 'customer_type', 'discount_category'] as $key) {
+        if (isset($sale[$key]) && $sale[$key] !== null && $sale[$key] !== '') {
+            $typeCandidates[] = strtolower(trim((string)$sale[$key]));
+        }
+    }
+
+    foreach ($typeCandidates as $candidate) {
+        if (strpos($candidate, 'pwd') !== false || strpos($candidate, 'person with disability') !== false) {
+            return 'PWD';
+        }
+        if (strpos($candidate, 'senior') !== false || strpos($candidate, 'citizen') !== false || strpos($candidate, 'snr') !== false) {
+            return 'SENIOR_CITIZEN';
+        }
+    }
+
+    $isPwd = isset($sale['is_pwd']) ? (int)$sale['is_pwd'] : 0;
+    $isSenior = isset($sale['is_senior']) ? (int)$sale['is_senior'] : 0;
+    if ($isPwd === 1) return 'PWD';
+    if ($isSenior === 1) return 'SENIOR_CITIZEN';
+
+    return 'NONE';
+}
 
 foreach ($sales_reports as $sale) {
     $total_sales += $sale['total_amount'];
@@ -51,8 +123,12 @@ foreach ($sales_reports as $sale) {
         $payment_breakdown['OTHER'] += $sale['total_amount'];
     }
     
-    // Simple discount tracking based on payment method or other criteria
-    $discount_breakdown['NO_DISCOUNT']++;
+    $resolvedDiscountType = resolve_discount_type($sale);
+    if ($resolvedDiscountType === 'PWD') {
+        $discount_breakdown['PWD']++;
+    } elseif ($resolvedDiscountType === 'SENIOR_CITIZEN') {
+        $discount_breakdown['SENIOR_CITIZEN']++;
+    }
 }
 
 $total_transactions = count($sales_reports);
@@ -103,7 +179,20 @@ $total_transactions = count($sales_reports);
             <input type="date" id="toDate" value="<?= $to_date ?>" form="filterForm" name="to_date">
         </div>
         <button onclick="applyFilter()" form="filterForm" type="submit">Apply Filter</button>
+        <button form="filterForm" type="submit" name="preset" value="today">Today</button>
+        <button form="filterForm" type="submit" name="preset" value="this_month">This Month</button>
     </div>
+
+    <?php if ($auto_adjusted_to_latest): ?>
+    <div class="alert-success">
+        ✅ No sales in selected range, so report was auto-adjusted to latest completed sale date: <?= date('M d, Y', strtotime($from_date)) ?>.
+    </div>
+    <?php elseif (empty($sales_reports) && $overall_completed_sales > 0): ?>
+    <div class="alert-error">
+        ⚠️ No completed sales in selected range. Latest completed sale: <?= $latest_completed_sale_date ? date('M d, Y H:i', strtotime($latest_completed_sale_date)) : 'N/A' ?>.
+        Try <strong>Today</strong> or <strong>This Month</strong>.
+    </div>
+    <?php endif; ?>
 
     <!-- Summary Statistics -->
     <div class="summary-grid">
@@ -140,7 +229,7 @@ $total_transactions = count($sales_reports);
             <h4>🎟️ Discount Type Breakdown</h4>
             <?php foreach ($discount_breakdown as $type => $count): ?>
             <div class="breakdown-item">
-                <span class="breakdown-label"><?= str_replace('_', ' ', $type) ?></span>
+                <span class="breakdown-label"><?= $type === 'SENIOR_CITIZEN' ? 'SENIOR CITIZEN' : $type ?></span>
                 <span class="breakdown-value"><?= $count ?> transaction(s)</span>
             </div>
             <?php endforeach; ?>
@@ -163,20 +252,31 @@ $total_transactions = count($sales_reports);
                         <th>Order No.</th>
                         <th>Items</th>
                         <th>Total Amount</th>
+                        <th>Discount Type</th>
                         <th>Payment Method</th>
                         <th>Staff</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($sales_reports)): ?>
-                    <tr><td colspan="6" class="empty-message">No sales records found for the selected date range.</td></tr>
+                    <tr><td colspan="7" class="empty-message">No sales records found for the selected date range.</td></tr>
                     <?php else: ?>
                         <?php foreach ($sales_reports as $sale): ?>
+                        <?php $discountType = resolve_discount_type($sale); ?>
                         <tr>
                             <td><?= date('M d, Y H:i', strtotime($sale['sale_date'])) ?></td>
                             <td><strong><?= htmlspecialchars($sale['sale_number']) ?></strong></td>
                             <td class="text-center"><?= $sale['item_count'] ?> item(s)</td>
                             <td><strong>₱<?= number_format($sale['total_amount'], 2) ?></strong></td>
+                            <td>
+                                <?php if ($discountType === 'PWD'): ?>
+                                    <span class="badge badge-warning">PWD</span>
+                                <?php elseif ($discountType === 'SENIOR_CITIZEN'): ?>
+                                    <span class="badge badge-info">SENIOR CITIZEN</span>
+                                <?php else: ?>
+                                    <span class="badge">NONE</span>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <span class="badge badge-primary"><?= htmlspecialchars($sale['payment_method'] ?? 'N/A') ?></span>
                             </td>

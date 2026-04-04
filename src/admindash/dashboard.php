@@ -127,7 +127,7 @@ $critical_stock = $conn->query("
         </div>
     </div>
 
-    <div class="page-container">
+    <div class="quick-actions-container">
         <div class="hero-quick-actions">
             <h2 class="hero-title">Quick Actions</h2>
             <div class="flex-gap">

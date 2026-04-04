@@ -257,4 +257,28 @@ function column_exists($table, $column) {
     $res = $conn->query("SHOW COLUMNS FROM `{$table}` LIKE '{$column}'");
     return ($res && $res->num_rows > 0);
 }
+
+/**
+ * Start database transaction
+ */
+function db_begin_transaction() {
+    global $conn;
+    return $conn->begin_transaction();
+}
+
+/**
+ * Commit database transaction
+ */
+function db_commit() {
+    global $conn;
+    return $conn->commit();
+}
+
+/**
+ * Rollback database transaction
+ */
+function db_rollback() {
+    global $conn;
+    return $conn->rollback();
+}
 ?>

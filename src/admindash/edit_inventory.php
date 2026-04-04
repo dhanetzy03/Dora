@@ -6,6 +6,67 @@ if (!isset($_SESSION["username"]) || $_SESSION["role"] !== "admin") {
 }
 require_once "../../config/db_connect.php";
 
+function sync_inventory_row_to_raw_materials(mysqli $conn, int $inventoryId): void {
+    $stmt = $conn->prepare("SELECT id, item_code, item_name, category, unit, stock_qty, reorder_level, COALESCE(cost_per_unit,0) AS cost_per_unit FROM inventory WHERE id = ? LIMIT 1");
+    if (!$stmt) return;
+    $stmt->bind_param("i", $inventoryId);
+    if (!$stmt->execute()) {
+        $stmt->close();
+        return;
+    }
+    $row = $stmt->get_result()->fetch_assoc();
+    $stmt->close();
+    if (!$row) return;
+
+    $itemCode = trim((string)($row['item_code'] ?? ''));
+    $itemName = trim((string)($row['item_name'] ?? ''));
+    $category = trim((string)($row['category'] ?? ''));
+    $unit = trim((string)($row['unit'] ?? 'pcs'));
+    $stockQty = (float)($row['stock_qty'] ?? 0);
+    $reorderLevel = (int)($row['reorder_level'] ?? 0);
+    $costPerUnit = (float)($row['cost_per_unit'] ?? 0);
+
+    $isRaw = (strcasecmp($category, 'Raw') === 0) || (stripos($itemCode, 'RM-') === 0);
+    if (!$isRaw || $itemName === '') return;
+
+    if ($itemCode === '') {
+        $itemCode = 'RM-' . strtoupper(substr(md5($itemName . '-' . $inventoryId), 0, 10));
+        $u = $conn->prepare("UPDATE inventory SET item_code = ? WHERE id = ?");
+        if ($u) {
+            $u->bind_param("si", $itemCode, $inventoryId);
+            $u->execute();
+            $u->close();
+        }
+    }
+
+    $find = $conn->prepare("SELECT material_id FROM raw_materials WHERE material_code = ? OR LOWER(TRIM(material_name)) = LOWER(TRIM(?)) LIMIT 1");
+    if (!$find) return;
+    $find->bind_param("ss", $itemCode, $itemName);
+    if (!$find->execute()) {
+        $find->close();
+        return;
+    }
+    $existing = $find->get_result()->fetch_assoc();
+    $find->close();
+
+    if ($existing && isset($existing['material_id'])) {
+        $materialId = (int)$existing['material_id'];
+        $up = $conn->prepare("UPDATE raw_materials SET material_code = ?, material_name = ?, category = 'Raw', unit = ?, quantity = ?, cost_per_unit = ?, reorder_level = ?, last_updated = NOW() WHERE material_id = ?");
+        if ($up) {
+            $up->bind_param("sssddii", $itemCode, $itemName, $unit, $stockQty, $costPerUnit, $reorderLevel, $materialId);
+            $up->execute();
+            $up->close();
+        }
+    } else {
+        $ins = $conn->prepare("INSERT INTO raw_materials (material_code, material_name, category, unit, quantity, cost_per_unit, reorder_level, supplier_id, last_updated) VALUES (?, ?, 'Raw', ?, ?, ?, ?, NULL, NOW())");
+        if ($ins) {
+            $ins->bind_param("sssddi", $itemCode, $itemName, $unit, $stockQty, $costPerUnit, $reorderLevel);
+            $ins->execute();
+            $ins->close();
+        }
+    }
+}
+
 // helper
 function back($key, $msg) {
     $_SESSION[$key] = $msg;
@@ -60,6 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // types: item_name (s), category (s), stock_qty (i), reorder_level (i), status (s), unit (s), stock_in (i), stock_out (i), id (i)
     $u->bind_param('ssiissiii', $item_name, $category, $stock_qty, $reorder_level, $status, $unit, $stock_in, $stock_out, $id);
     if ($u->execute()) {
+        sync_inventory_row_to_raw_materials($conn, $id);
         back('success', 'Item updated successfully.');
     } else {
         back('error', 'Failed to update item.');

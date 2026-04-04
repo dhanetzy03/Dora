@@ -22,20 +22,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     // Get current stock and name
-    $stmt = $conn->prepare("SELECT stock_qty, item_name FROM inventory WHERE id = ?");
+    $stmt = $conn->prepare("SELECT stock_qty, item_name, stock_in, stock_out FROM inventory WHERE id = ?");
     $stmt->bind_param("i", $item_id);
     $stmt->execute();
     $result = $stmt->get_result();
     $item = $result->fetch_assoc();
     $current_stock = (int)$item['stock_qty'];
+    $current_stock_in = (int)($item['stock_in'] ?? 0);
+    $current_stock_out = (int)($item['stock_out'] ?? 0);
     $stmt->close();
 
     // Calculate new stock
     if ($adjustment_type === 'in') {
         $new_stock = $current_stock + $quantity;
+        $new_stock_in = $current_stock_in + (int)$quantity;
+        $new_stock_out = $current_stock_out;
         $movement_qty = $quantity;
     } else {
         $new_stock = $current_stock - $quantity;
+        $new_stock_in = $current_stock_in;
+        $new_stock_out = $current_stock_out + (int)$quantity;
         $movement_qty = $quantity;
     }
 
@@ -45,54 +51,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit();
     }
 
-    // Update inventory
-    $stmt = $conn->prepare("UPDATE inventory SET stock_qty = ?, last_updated = NOW() WHERE id = ?");
-    $stmt->bind_param("ii", $new_stock, $item_id);
-    $stmt->execute();
-    $stmt->close();
-
-    // Sync to products.stock if a product with same name exists
-    if (!empty($item['item_name'])) {
-        $prodStmt = $conn->prepare("SELECT product_id FROM products WHERE product_name = ? LIMIT 1");
-        $prodStmt->bind_param("s", $item['item_name']);
-        $prodStmt->execute();
-        $prodRes = $prodStmt->get_result();
-        if ($prodRes && $prodRes->num_rows > 0) {
-            $prodId = $prodRes->fetch_assoc()['product_id'];
-            $prodStmt->close();
-            // upsert into stock
-            $s = $conn->prepare("SELECT stock_id FROM stock WHERE product_id = ? LIMIT 1");
-            $s->bind_param("i", $prodId);
-            $s->execute();
-            $sr = $s->get_result();
-            if ($sr && $sr->num_rows > 0) {
-                $sid = $sr->fetch_assoc()['stock_id'];
-                $s->close();
-                $u = $conn->prepare("UPDATE stock SET quantity = ?, last_updated = NOW() WHERE stock_id = ?");
-                $u->bind_param("di", $new_stock, $sid);
-                $u->execute();
-                $u->close();
-            } else {
-                $s->close();
-                $ins = $conn->prepare("INSERT INTO stock (product_id, quantity, last_updated) VALUES (?, ?, NOW())");
-                $ins->bind_param("id", $prodId, $new_stock);
-                $ins->execute();
-                $ins->close();
-            }
-        } else {
-            $prodStmt->close();
+    // Start transaction
+    db_begin_transaction();
+    
+    try {
+        // Update inventory
+        $stmt = $conn->prepare("UPDATE inventory SET stock_qty = ?, stock_in = ?, stock_out = ?, last_updated = NOW() WHERE id = ?");
+        $stmt->bind_param("iiii", $new_stock, $new_stock_in, $new_stock_out, $item_id);
+        if (!$stmt->execute()) {
+            throw new Exception('Failed to update inventory');
         }
+        $stmt->close();
+
+        // Sync to products.stock if a product with same name exists
+        if (!empty($item['item_name'])) {
+            $prodStmt = $conn->prepare("SELECT product_id FROM products WHERE LOWER(product_name) = LOWER(?) LIMIT 1");
+            $prodStmt->bind_param("s", $item['item_name']);
+            $prodStmt->execute();
+            $prodRes = $prodStmt->get_result();
+            if ($prodRes && $prodRes->num_rows > 0) {
+                $prodId = $prodRes->fetch_assoc()['product_id'];
+                $prodStmt->close();
+                // upsert into stock
+                $s = $conn->prepare("SELECT stock_id FROM stock WHERE product_id = ? LIMIT 1");
+                $s->bind_param("i", $prodId);
+                $s->execute();
+                $sr = $s->get_result();
+                if ($sr && $sr->num_rows > 0) {
+                    $sid = $sr->fetch_assoc()['stock_id'];
+                    $s->close();
+                    $u = $conn->prepare("UPDATE stock SET quantity = ?, last_updated = NOW() WHERE stock_id = ?");
+                    $u->bind_param("di", $new_stock, $sid);
+                    if (!$u->execute()) {
+                        throw new Exception('Failed to sync stock quantity');
+                    }
+                    $u->close();
+                } else {
+                    $s->close();
+                    $ins = $conn->prepare("INSERT INTO stock (product_id, quantity, last_updated) VALUES (?, ?, NOW())");
+                    $ins->bind_param("id", $prodId, $new_stock);
+                    if (!$ins->execute()) {
+                        throw new Exception('Failed to create stock entry');
+                    }
+                    $ins->close();
+                }
+            } else {
+                $prodStmt->close();
+            }
+        }
+
+        // Insert stock movement
+        $stmt = $conn->prepare("INSERT INTO stock_movements (product_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, reference_number, remarks, created_by) VALUES (?, ?, ?, ?, ?, 'adjustment', ?, ?, ?)");
+        $stmt->bind_param("isddsssi", $item_id, $adjustment_type, $movement_qty, $current_stock, $new_stock, $reference_number, $reason, $_SESSION['user_id']);
+        if (!$stmt->execute()) {
+            throw new Exception('Failed to create stock movement');
+        }
+        $stmt->close();
+
+        db_commit();
+        $_SESSION['success'] = 'Stock adjustment recorded successfully.';
+        header('Location: adjusting_entry.php');
+        exit();
+    } catch (Exception $e) {
+        db_rollback();
+        $_SESSION['error'] = 'Database operation failed: ' . $e->getMessage();
+        header('Location: adjusting_entry.php');
+        exit();
     }
-
-    // Insert stock movement
-    $stmt = $conn->prepare("INSERT INTO stock_movements (product_id, movement_type, quantity, previous_quantity, new_quantity, reference_type, reference_number, remarks, created_by) VALUES (?, ?, ?, ?, ?, 'adjustment', ?, ?, ?)");
-    $stmt->bind_param("isddsssi", $item_id, $adjustment_type, $movement_qty, $current_stock, $new_stock, $reference_number, $reason, $_SESSION['user_id']);
-    $stmt->execute();
-    $stmt->close();
-
-    $_SESSION['success'] = 'Stock adjustment recorded successfully.';
-    header('Location: adjusting_entry.php');
-    exit();
 }
 
 // Fetch inventory items for dropdown

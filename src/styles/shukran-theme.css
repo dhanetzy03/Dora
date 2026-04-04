@@ -819,6 +819,20 @@ body.collapsed .sidebar-toggle, html.sidebar-will-collapse .sidebar-toggle { dis
   padding: 24px 26px; border-radius: var(--r-lg);
   color: white; position: relative; overflow: hidden;
 }
+.quick-actions-container {
+  max-width: none;
+  width: 100%;
+  margin: 14px 0 20px;
+  padding: 0 30px;
+  box-sizing: border-box;
+}
+.quick-actions-container .hero-quick-actions {
+  width: 100%;
+}
+.main-content .quick-actions-container {
+  max-width: none !important;
+  width: 100% !important;
+}
 .hero-quick-actions::before {
   content: '';
   position: absolute; inset: 0; pointer-events: none;

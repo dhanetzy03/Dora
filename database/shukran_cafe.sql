@@ -141,10 +141,9 @@ CREATE TABLE IF NOT EXISTS `sales` (
   FOREIGN KEY (`validated_by`) REFERENCES `users`(`user_id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- ================================================
 -- Table: sale_items
 -- Purpose: Individual items in a sale
--- ================================================
+
 CREATE TABLE IF NOT EXISTS `sale_items` (
   `sale_item_id` INT(11) NOT NULL AUTO_INCREMENT,
   `sale_id` INT(11) NOT NULL,

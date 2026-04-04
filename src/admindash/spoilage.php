@@ -9,9 +9,38 @@ require_once "../../config/db_connect.php";
 $msg = '';
 $err = '';
 
+// Load session messages if exist
+if (isset($_SESSION['success'])) {
+    $msg = $_SESSION['success'];
+    unset($_SESSION['success']);
+}
+if (isset($_SESSION['error'])) {
+    $err = $_SESSION['error'];
+    unset($_SESSION['error']);
+}
+
 // Fetch product list and inventory list for selection
 $products = $conn->query("SELECT p.product_id, p.product_name, COALESCE(s.quantity,0) as stock_qty FROM products p LEFT JOIN stock s ON p.product_id = s.product_id ORDER BY product_name ASC")->fetch_all(MYSQLI_ASSOC);
 $inventory = $conn->query("SELECT id, item_name, stock_qty, COALESCE(cost_per_unit,0) as cost_per_unit FROM inventory ORDER BY item_name ASC")->fetch_all(MYSQLI_ASSOC);
+
+// Handle spoilage deletion
+if (isset($_GET['delete_id'])) {
+    $delete_id = (int)$_GET['delete_id'];
+    if ($delete_id > 0) {
+        $stmt = $conn->prepare("DELETE FROM spoilage_records WHERE spoilage_id = ?");
+        if ($stmt) {
+            $stmt->bind_param('i', $delete_id);
+            if ($stmt->execute()) {
+                $_SESSION['success'] = 'Spoilage record deleted successfully.';
+            } else {
+                $_SESSION['error'] = 'Failed to delete spoilage record.';
+            }
+            $stmt->close();
+        }
+    }
+    header('Location: spoilage.php');
+    exit();
+}
 
 // Handle spoilage submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_spoilage'])) {
@@ -87,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_spoilage'])) {
             $item_id = (int)($_POST['inventory_id'] ?? 0);
             if ($item_id <= 0) { $err = 'Select an inventory item.'; }
             else {
-                $q = $conn->prepare("SELECT item_name, stock_qty, cost_per_unit, unit FROM inventory WHERE id = ? LIMIT 1");
+                $q = $conn->prepare("SELECT item_name, stock_qty, stock_in, stock_out, cost_per_unit, unit FROM inventory WHERE id = ? LIMIT 1");
                 $q->bind_param('i', $item_id);
                 $q->execute();
                 $idata = $q->get_result()->fetch_assoc();
@@ -97,10 +126,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['record_spoilage'])) {
                 $unit_cost = (float)($idata['cost_per_unit'] ?? 0);
                 $unit = $idata['unit'] ?? 'pcs';
                 $new = max(0, $prev - $qty);
+                $new_stock_out = ((int)($idata['stock_out'] ?? 0)) + (int)$qty;
                 
-                // Update inventory
-                $u = $conn->prepare("UPDATE inventory SET stock_qty = ?, last_updated = NOW() WHERE id = ?");
-                $u->bind_param('di', $new, $item_id);
+                // Update inventory with stock_out increment
+                $u = $conn->prepare("UPDATE inventory SET stock_qty = ?, stock_out = ?, last_updated = NOW() WHERE id = ?");
+                $u->bind_param('dii', $new, $new_stock_out, $item_id);
                 $u->execute();
                 $u->close();
 
@@ -236,11 +266,12 @@ $spoilage_records = $conn->query("SELECT s.*, u.username FROM spoilage_records s
                         <th>Reason</th>
                         <th>Details</th>
                         <th>Recorded By</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($spoilage_records)): ?>
-                        <tr><td colspan="9" class="td-center-gray">No spoilage records found</td></tr>
+                        <tr><td colspan="10" class="td-center-gray">No spoilage records found</td></tr>
                     <?php else: ?>
                         <?php foreach ($spoilage_records as $rec): ?>
                             <tr>
@@ -253,6 +284,7 @@ $spoilage_records = $conn->query("SELECT s.*, u.username FROM spoilage_records s
                                 <td><span class="badge badge-warning"><?= ucfirst($rec['spoilage_reason']) ?></span></td>
                                 <td><?= htmlspecialchars($rec['reason_details'] ?: '-') ?></td>
                                 <td><?= htmlspecialchars($rec['username'] ?? 'System') ?></td>
+                                <td><a href="spoilage.php?delete_id=<?= $rec['spoilage_id'] ?>" class="btn-sm btn-danger" onclick="return confirm('Delete this spoilage record?');">Delete</a></td>
                             </tr>
                         <?php endforeach; ?>
                     <?php endif; ?>
